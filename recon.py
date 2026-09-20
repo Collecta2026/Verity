@@ -30,6 +30,7 @@ def _frame(engagement_id, side, month):
     return [{"id": t.id, "date": pd.Timestamp(t.date), "cp": (t.counterparty or "").upper(),
              "cid": t.counterparty_id or "", "amount_in": t.amount_in, "amount_out": t.amount_out,
              "mag": round(t.amount_out if t.amount_out > 0 else t.amount_in, 2),
+             "ccy": (t.currency or "").upper(),
              "dir": "OUT" if t.amount_out > 0 else "IN",
              "refn": norm_ref(t.reference), "desc": norm_desc(t.description or t.txn_type),
              "used": False, "o": t} for t in q]
@@ -51,9 +52,12 @@ def run_month(engagement, month, settings):
         t["o"].matched = False
         t["o"].match_tier = None
 
+    # The index key includes currency: an EGP entry is only ever considered
+    # against an EGP entry. Matching across currencies would be meaningless and
+    # would manufacture false clearances.
     idx = defaultdict(list)
     for j, l in enumerate(ledger):
-        idx[(l["dir"], int(round(l["mag"] * 100)))].append(j)
+        idx[(l["dir"], l["ccy"], int(round(l["mag"] * 100)))].append(j)
 
     quarter = None
     matches = []
@@ -63,7 +67,7 @@ def run_month(engagement, month, settings):
         quarter = quarter or b["o"].quarter
         best = None
         # tiers 1-4: same direction and amount
-        for j in idx.get((b["dir"], int(round(b["mag"] * 100))), []):
+        for j in idx.get((b["dir"], b["ccy"], int(round(b["mag"] * 100))), []):
             l = ledger[j]
             if l["used"]:
                 continue
@@ -82,7 +86,7 @@ def run_month(engagement, month, settings):
         # tier 5: description similarity, amount within tolerance, wider window
         if best is None and b["desc"]:
             for j, l in enumerate(ledger):
-                if l["used"] or l["dir"] != b["dir"]:
+                if l["used"] or l["dir"] != b["dir"] or l["ccy"] != b["ccy"]:
                     continue
                 if abs(l["mag"] - b["mag"]) > max(tol, b["mag"] * 0.001):
                     continue
@@ -98,7 +102,8 @@ def run_month(engagement, month, settings):
             b["o"].match_tier = l["o"].match_tier = TIERS[tier]
             matches.append(Match(engagement_id=eid, quarter=b["o"].quarter, month=month,
                                  tier=tier, tier_label=TIERS[tier], confidence=CONF[tier],
-                                 date_gap_days=int(gap), amount=b["mag"], direction=b["dir"],
+                                 date_gap_days=int(gap), amount=b["mag"], currency=b["ccy"],
+                                 direction=b["dir"],
                                  bank_txn_id=b["id"], ledger_txn_id=l["id"]))
 
     # tier 6: splits / aggregation, both directions
@@ -108,7 +113,7 @@ def run_month(engagement, month, settings):
             if o["used"]:
                 continue
             pool = [k for k, m in enumerate(many)
-                    if not m["used"] and m["dir"] == o["dir"]
+                    if not m["used"] and m["dir"] == o["dir"] and m["ccy"] == o["ccy"]
                     and abs((m["date"] - o["date"]).days) <= win]
             if not (2 <= len(pool) <= 25):
                 continue
@@ -142,10 +147,17 @@ def run_month(engagement, month, settings):
 
     ghost = [l for l in ledger if not l["used"] and l["amount_out"] > 0]
     unrec = [b for b in bank if not b["used"] and b["amount_out"] > 0]
+
+    def by_ccy(rows):
+        out = {}
+        for r in rows:
+            out[r["ccy"]] = round(out.get(r["ccy"], 0) + r["amount_out"], 2)
+        return out
+
     return {"month": month, "matched": len(matches), "splits": len(splits),
             "ghost": len(ghost), "unrecorded": len(unrec),
-            "ghost_value": round(sum(l["amount_out"] for l in ghost), 2),
-            "unrecorded_value": round(sum(b["amount_out"] for b in unrec), 2)}
+            "ghost_value": by_ccy(ghost), "unrecorded_value": by_ccy(unrec),
+            "currencies": sorted({t["ccy"] for t in bank + ledger if t["ccy"]})}
 
 
 def run_quarter(engagement, quarter, months, settings):
@@ -173,6 +185,7 @@ def raise_exceptions(engagement, quarter):
         db.session.add(Exception_(engagement_id=eid, ref=exception_ref(engagement, quarter),
             quarter=quarter, month=t.month, category=cat, txn_id=t.id, date=t.date,
             counterparty=t.counterparty, amount=t.amount_out or t.amount_in,
+            currency=t.currency, base_amount=(t.base_out or t.base_in),
             detail=f"{t.channel} {t.reference or ''} — {t.description or t.txn_type or ''}".strip()))
         made += 1
         db.session.flush()

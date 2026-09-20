@@ -4,7 +4,8 @@ seed.py — default users and (optionally) a demo engagement.
 import json, os, random
 from datetime import date, timedelta, datetime
 from config import DEFAULT_SETTINGS, STARTER_ACCOUNTS
-from models import (User, Engagement, Account, Txn, Balance, DocumentFile, ROLES)
+from models import (User, Engagement, Account, Txn, Balance, DocumentFile,
+                    FxRate, ROLES)
 import core, project
 
 # Only the administrator is created on a live deployment. Every other account is
@@ -94,6 +95,12 @@ def _demo(db):
         db.session.add(a)
         db.session.commit()
         accs[code] = a
+    # a USD account, to exercise multi-currency
+    usd = Account(engagement_id=e.id, code="CIBUSD", name="CIB — USD account",
+                  kind="bank", identifier="", currency="USD")
+    db.session.add(usd)
+    db.session.commit()
+    accs["CIBUSD"] = usd
 
     core.build_periods(e)
     by_role = {r: u.id for r in ROLES for u in [User.query.filter_by(role=r).first()] if u}
@@ -104,11 +111,12 @@ def _demo(db):
     start = date(2023, 5, 1)
     def d(n): return start + timedelta(days=n)
 
-    def add(acc, dt, cp, cid, ai, ao, ref, gl="", desc=""):
+    def add(acc, dt, cp, cid, ai, ao, ref, gl="", desc="", ccy=None):
         db.session.add(Txn(engagement_id=e.id, account_id=acc.id, side=acc.side,
             channel=acc.code, month=core.month_of(dt), quarter=core.quarter_of(dt), date=dt,
             counterparty=cp, counterparty_id=cid or "", amount_in=ai, amount_out=ao,
-            reference=ref, gl_ref=gl, description=desc, txn_type=desc))
+            reference=ref, gl_ref=gl, description=desc, txn_type=desc,
+            currency=(ccy or acc.currency or "EGP")))
 
     ref = 1000
     for k in range(60):
@@ -145,7 +153,31 @@ def _demo(db):
         r = f"TRX{ref}"
         add(accs["CIB"], d(30 * k + 5), "Falcon Services", "EG555", 0, 25000, r, "", "Service fee")
         add(accs["GL"], d(30 * k + 6), "Falcon Services", "EG555", 0, 25000, r, f"V{ref}", "Service fee")
+    # ---- USD activity: matched pairs, one unrecorded USD payment ----------
+    for k in range(6):
+        ref += 1
+        r = f"USD{ref}"
+        amt = [4500, 12000, 7800, 25000, 3200, 18500][k]
+        day = 60 * k + 20
+        add(accs["CIBUSD"], d(day), f"Overseas Supplier {k%3}", "US88..%02d" % k, 0, amt, r,
+            desc="Equipment import")
+        add(accs["GL"], d(day + 1), f"Overseas Supplier {k%3}", "US88..%02d" % k, 0, amt, r,
+            f"V{ref}", "Equipment import", ccy="USD")
+    # a USD payment never booked to the ledger
+    add(accs["CIBUSD"], d(430), "Gulf Trading FZE", "AE99..01", 0, 32000, "USD9901",
+        desc="Advance payment")
     db.session.commit()
+
+    # ---- FX rates for USD -------------------------------------------------
+    months = sorted({t.month for t in Txn.query.filter_by(engagement_id=e.id,
+                                                          currency="USD").all()})
+    rate = 30.90
+    for i, m in enumerate(months):
+        db.session.add(FxRate(engagement_id=e.id, currency="USD", month=m,
+                              rate=round(rate + i * 1.8, 4),
+                              source="CBE month-end", entered_by="seed"))
+    db.session.commit()
+    core.reprice(e)
 
     # ---- balances, with one deliberate continuity break -------------------
     for code in ("CIB", "VODA"):
@@ -161,8 +193,8 @@ def _demo(db):
                 opening = running - 18500      # planted continuity break
             closing = opening + mv
             db.session.add(Balance(engagement_id=e.id, account_id=acc.id, month=m,
-                quarter=f"{m[:4]}-Q{(int(m[5:7])-1)//3+1}", opening=round(opening, 2),
-                closing=round(closing, 2), entered_by="seed"))
+                quarter=f"{m[:4]}-Q{(int(m[5:7])-1)//3+1}", currency=acc.currency,
+                opening=round(opening, 2), closing=round(closing, 2), entered_by="seed"))
             running = closing
     db.session.commit()
     core.recompute_balances(e)

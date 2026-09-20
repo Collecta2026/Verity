@@ -1,4 +1,11 @@
-{% extends 'base.html' %}{% block heading %}Upload data{% endblock %}
+{% extends 'base.html' %}{% block heading %}Upload data<h2>Saved column mappings</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>Name</th><th>{{ t('lbl.account') }}</th><th>Columns recognised</th><th>Created by</th></tr>
+{% for tpl in templates %}<tr><td><b>{{ tpl.name }}</b></td><td>{{ tpl.account.code if tpl.account }}</td>
+<td class="muted" style="font-size:12px">{{ (tpl.sample_headers or '')[:90] }}</td><td class="muted">{{ tpl.created_by }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">None saved yet — tick "Save this mapping" when you import a file.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}
 {% block content %}
 <h1>Upload data</h1><p class="sub">Statements and ledger extracts. Every file is hashed on arrival; originals are never altered. Upload quarter by quarter or in full — the system files each transaction into its own month automatically.</p>
 {% if current_user.can('lead','finance_reviewer','assistant') %}
@@ -8,7 +15,8 @@
     <div style="flex:2"><label>File (.csv / .xlsx)</label><input type="file" name="file" accept=".csv,.xlsx,.xls" required></div>
     <div style="display:flex;align-items:flex-end"><button class="btn">{{ t('data.upload') }}</button></div>
   </div>
-</form></div>
+</form>
+  <p class="muted" style="margin-bottom:0;font-size:12px">After choosing a file you'll see its actual column headers and confirm what each one means. Nothing is imported until you approve the mapping.</p></div>
 {% endif %}
 <div class="card" style="padding:0"><table>
 <tr><th>{{ t('lbl.account') }}</th><th>{{ t('lbl.file') }}</th><th>{{ t('lbl.period') }}</th><th>{{ t('lbl.rows') }}</th><th>{{ t('lbl.hash') }}</th><th>{{ t('lbl.uploadedby') }}</th><th>{{ t('lbl.when') }}</th></tr>
@@ -16,5 +24,12 @@
 <td class="muted">{{ s.quarter or '—' }}</td><td>{{ s.rows_loaded }}</td><td class="mono">{{ s.sha256[:16] }}…</td>
 <td class="muted">{{ s.uploaded_by }}</td><td class="muted">{{ s.uploaded_at.strftime('%d %b %H:%M') }}</td></tr>
 {% else %}<tr><td colspan="7" class="muted">{{ t('data.nothing') }}</td></tr>{% endfor %}
+</table></div>
+<h2>Saved column mappings</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>Name</th><th>{{ t('lbl.account') }}</th><th>Columns recognised</th><th>Created by</th></tr>
+{% for tpl in templates %}<tr><td><b>{{ tpl.name }}</b></td><td>{{ tpl.account.code if tpl.account }}</td>
+<td class="muted" style="font-size:12px">{{ (tpl.sample_headers or '')[:90] }}</td><td class="muted">{{ tpl.created_by }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">None saved yet — tick "Save this mapping" when you import a file.</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

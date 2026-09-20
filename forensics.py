@@ -10,10 +10,12 @@ from ingest import clean_id
 from core import exception_ref
 
 
-def benford(engagement_id, quarter=None):
+def benford(engagement_id, quarter=None, currency=None):
     q = Txn.query.filter_by(engagement_id=engagement_id, side="bank")
     if quarter:
         q = q.filter_by(quarter=quarter)
+    if currency:
+        q = q.filter_by(currency=currency)
     vals = [t.amount_out for t in q.all() if t.amount_out > 0]
     obs = Counter()
     for v in vals:
@@ -36,6 +38,7 @@ def run(engagement, quarter=None):
     """Raise red-flag exceptions. Idempotent — won't duplicate existing ones."""
     s = engagement.settings()
     eid = engagement.id
+    base = engagement.currency or "EGP"
     q = Txn.query.filter_by(engagement_id=eid, side="bank")
     if quarter:
         q = q.filter_by(quarter=quarter)
@@ -48,7 +51,8 @@ def run(engagement, quarter=None):
             return
         db.session.add(Exception_(engagement_id=eid, ref=exception_ref(engagement, t.quarter),
             quarter=t.quarter, month=t.month, category=cat, txn_id=t.id, date=t.date,
-            counterparty=t.counterparty, amount=t.amount_out, detail=detail))
+            counterparty=t.counterparty, amount=t.amount_out, currency=t.currency,
+            base_amount=t.base_out, detail=detail))
         db.session.flush()
         existing.add((cat, t.id))
         made[cat] += 1
@@ -66,18 +70,26 @@ def run(engagement, quarter=None):
         if hits:
             raise_("Watchlist hit", t, "; ".join(hits))
 
-    # structuring
+    # Structuring — authorisation limits are set in the base currency, so a
+    # foreign-currency payment is tested on its base-currency equivalent.
     band = s.get("threshold_band", 0.05)
     for th in s.get("approval_thresholds", []):
         for t in outs:
-            if th * (1 - band) <= t.amount_out < th:
-                raise_("Structuring", t, f"{t.amount_out/th*100:.1f}% of {th:,} authorisation limit")
+            v = t.base_out if (t.currency or base) != base else t.amount_out
+            if not v:
+                continue
+            if th * (1 - band) <= v < th:
+                note = f"{v/th*100:.1f}% of {th:,} {base} authorisation limit"
+                if (t.currency or base) != base:
+                    note += f" ({t.currency} {t.amount_out:,.2f} at {t.fx_rate})"
+                raise_("Structuring", t, note)
 
     # duplicates
     dwin = s.get("duplicate_window", 7)
     by = {}
     for t in outs:
-        by.setdefault((round(t.amount_out, 2), (t.counterparty or "").upper()), []).append(t)
+        by.setdefault((round(t.amount_out, 2), (t.counterparty or "").upper(),
+                       t.currency or base), []).append(t)
     for g in by.values():
         g.sort(key=lambda x: x.date)
         for i in range(1, len(g)):

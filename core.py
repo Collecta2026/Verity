@@ -3,7 +3,8 @@ core.py — reference generation, period scaffolding, balance continuity.
 """
 from datetime import date, timedelta
 from calendar import monthrange
-from models import db, Period, Exception_, DocRequest, DocumentFile, Task, Balance, Txn, Account
+from models import (db, Period, Exception_, DocRequest, DocumentFile, Task,
+                    Balance, Txn, Account, FxRate)
 
 
 # ---------------------------------------------------------------- references
@@ -133,3 +134,79 @@ def _month_gap(a, b):
 def balance_anomalies(engagement_id):
     return (Balance.query.filter_by(engagement_id=engagement_id)
             .filter(Balance.anomaly.isnot(None)).order_by(Balance.month).all())
+
+
+# ---------------------------------------------------------------- currency
+def reprice(engagement):
+    """Restate every foreign-currency transaction in the base currency using the
+    month's rate. Reporting only — matching is always done in the original currency."""
+    base = engagement.currency or "EGP"
+    rates = {(r.currency, r.month): r.rate for r in
+             FxRate.query.filter_by(engagement_id=engagement.id).all()}
+
+    def rate_for(ccy, month):
+        if ccy == base:
+            return 1.0
+        if (ccy, month) in rates:
+            return rates[(ccy, month)]
+        earlier = sorted([m for (c, m) in rates if c == ccy and m < month])
+        return rates[(ccy, earlier[-1])] if earlier else None
+
+    n = 0
+    for t in Txn.query.filter_by(engagement_id=engagement.id).all():
+        ccy = (t.currency or base).upper()
+        r = rate_for(ccy, t.month)
+        if r is None:
+            t.fx_rate = t.base_in = t.base_out = None
+            continue
+        t.fx_rate = r
+        t.base_in = round((t.amount_in or 0) * r, 2)
+        t.base_out = round((t.amount_out or 0) * r, 2)
+        n += 1
+    for x in Exception_.query.filter_by(engagement_id=engagement.id).all():
+        tx = db.session.get(Txn, x.txn_id) if x.txn_id else None
+        if tx:
+            x.currency = tx.currency
+            x.base_amount = tx.base_out or tx.base_in
+    db.session.commit()
+    return n
+
+
+def missing_rates(engagement_id):
+    """Foreign-currency months with no rate — figures that cannot yet be stated
+    in the base currency. The base currency itself never needs a rate."""
+    from models import Engagement
+    eng = db.session.get(Engagement, engagement_id)
+    base = (eng.currency or "EGP").upper() if eng else "EGP"
+    rows = (db.session.query(Txn.currency, Txn.month)
+            .filter(Txn.engagement_id == engagement_id).distinct().all())
+    have = {(r.currency, r.month) for r in
+            FxRate.query.filter_by(engagement_id=engagement_id).all()}
+    out = []
+    for ccy, month in rows:
+        if not ccy or not month or ccy.upper() == base:
+            continue
+        if (ccy, month) in have:
+            continue
+        out.append((ccy, month))
+    return sorted(out)
+
+
+def currency_totals(engagement_id, quarter=None):
+    """Outflow totals per currency, with the base-currency equivalent."""
+    q = Txn.query.filter_by(engagement_id=engagement_id, side="bank")
+    if quarter:
+        q = q.filter_by(quarter=quarter)
+    out = {}
+    for t in q.all():
+        if not t.amount_out:
+            continue
+        c = t.currency or "?"
+        d = out.setdefault(c, {"amount": 0.0, "base": 0.0, "count": 0, "unpriced": 0})
+        d["amount"] += t.amount_out
+        d["count"] += 1
+        if t.base_out is None:
+            d["unpriced"] += 1
+        else:
+            d["base"] += t.base_out
+    return out

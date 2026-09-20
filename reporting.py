@@ -63,12 +63,25 @@ def build_workbook(engagement) -> bytes:
     for col, w in zip("ABCDEFGH", [12, 9, 13, 10, 12, 8, 14, 18]):
         ws.column_dimensions[col].width = w
 
+    base = engagement.currency or "EGP"
     _sheet(wb, "Exceptions",
-           ["Ref", "Quarter", "Category", "Date", "Counterparty", "Amount", "Status", "Detail", "Resolution"],
-           [(x.ref, x.quarter, x.category, x.date, x.counterparty, x.amount, x.status,
-             x.detail, x.resolution) for x in
+           ["Ref", "Quarter", "Category", "Date", "Counterparty", "Currency", "Amount",
+            f"Amount ({base})", "Status", "Detail", "Resolution"],
+           [(x.ref, x.quarter, x.category, x.date, x.counterparty, x.currency or base,
+             x.amount, x.base_amount, x.status, x.detail, x.resolution) for x in
             Exception_.query.filter_by(engagement_id=eid).order_by(Exception_.quarter).all()],
-           red_col=6, red_val="Open")
+           red_col=8, red_val="Open")
+
+    from models import FxRate
+    _sheet(wb, "FX_rates", ["Currency", "Month", f"Rate to {base}", "Source", "Entered by"],
+           [(r.currency, r.month, r.rate, r.source, r.entered_by) for r in
+            FxRate.query.filter_by(engagement_id=eid).order_by(FxRate.currency, FxRate.month).all()])
+
+    import core as _core
+    _sheet(wb, "By_currency",
+           ["Currency", "Payments", "Total in currency", f"Total in {base}", "Unpriced items"],
+           [(c, v["count"], round(v["amount"], 2), round(v["base"], 2), v["unpriced"])
+            for c, v in _core.currency_totals(eid).items()])
 
     _sheet(wb, "Document_requests",
            ["Ref", "Quarter", "Addressee", "Documents", "Raised", "Due", "Status", "Chases", "Response"],
@@ -78,14 +91,16 @@ def build_workbook(engagement) -> bytes:
             DocRequest.query.filter_by(engagement_id=eid).all()])
 
     _sheet(wb, "Balance_continuity",
-           ["Account", "Month", "Opening", "Closing", "Movement", "Variance", "Continuity gap", "Anomaly"],
-           [(b.account.code if b.account else "", b.month, b.opening, b.closing,
+           ["Account", "Currency", "Month", "Opening", "Closing", "Movement", "Variance",
+            "Continuity gap", "Anomaly"],
+           [(b.account.code if b.account else "", b.currency or (b.account.currency if b.account else ""),
+             b.month, b.opening, b.closing,
              b.computed_movement, b.variance, b.continuity_gap, b.anomaly) for b in
             Balance.query.filter_by(engagement_id=eid).order_by(Balance.month).all()])
 
     _sheet(wb, "Match_quality",
-           ["Quarter", "Month", "Tier", "How matched", "Confidence", "Amount", "Date gap"],
-           [(m.quarter, m.month, m.tier, m.tier_label, m.confidence, m.amount, m.date_gap_days)
+           ["Quarter", "Month", "Tier", "How matched", "Confidence", "Currency", "Amount", "Date gap"],
+           [(m.quarter, m.month, m.tier, m.tier_label, m.confidence, m.currency, m.amount, m.date_gap_days)
             for m in Match.query.filter_by(engagement_id=eid).order_by(Match.quarter).all()])
 
     _sheet(wb, "Split_posting", ["Quarter", "Pattern", "Amount", "Counterparty", "Linked"],

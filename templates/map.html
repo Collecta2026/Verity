@@ -1,0 +1,59 @@
+{% extends 'base.html' %}{% block heading %}Map columns{% endblock %}
+{% block content %}
+<h1>Map the file's columns</h1>
+<p class="sub">{{ original }} · {{ nrows }} rows · loading into <b>{{ acc.code }}</b> ({{ acc.name }}, {{ acc.currency }}).
+Tell the system which column is which. Best guesses are filled in — check them, then import.</p>
+
+{% if templates %}
+<div class="card" style="padding:12px">
+  <form method="get" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+    <input type="hidden" name="stored" value="{{ stored }}"><input type="hidden" name="original" value="{{ original }}">
+    <input type="hidden" name="account_id" value="{{ acc.id }}">
+    <div><label>Use a saved mapping</label><select name="template_id">
+      <option value="">— best guess —</option>
+      {% for t in templates %}<option value="{{ t.id }}">{{ t.name }}{% if t.account %} ({{ t.account.code }}){% endif %}</option>{% endfor %}
+    </select></div>
+    <div><button class="btn sec">Apply</button></div>
+  </form>
+</div>
+{% endif %}
+
+<form method="post">
+<input type="hidden" name="stored" value="{{ stored }}"><input type="hidden" name="original" value="{{ original }}">
+<input type="hidden" name="account_id" value="{{ acc.id }}"><input type="hidden" name="confirm" value="1">
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th style="width:190px">Field</th><th style="width:230px">Column in your file</th><th>What it's for</th></tr>
+{% for f in fields %}
+<tr>
+  <td><b>{{ labels[f][0] }}</b>{% if f == 'date' %} <span class="badge b-bad">required</span>{% endif %}</td>
+  <td><select name="map_{{ f }}">
+      <option value="">— not in this file —</option>
+      {% for h in headers %}<option value="{{ h }}" {{ 'selected' if mapping.get(f) == h }}>{{ h }}</option>{% endfor %}
+  </select></td>
+  <td class="muted" style="font-size:12px">{{ labels[f][1] }}</td>
+</tr>
+{% endfor %}
+</table></div>
+
+<div class="card">
+  <b style="font-size:13px">First rows of your file</b>
+  <div style="overflow-x:auto;margin-top:8px"><table>
+    <tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr>
+    {% for row in sample %}<tr>{% for c in row %}<td class="muted" style="font-size:12px">{{ c[:40] }}</td>{% endfor %}</tr>{% endfor %}
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <div><label><input type="checkbox" name="save_template" value="1" style="width:auto"> Save this mapping for reuse</label>
+      <input name="template_name" placeholder="e.g. CIB monthly statement"></div>
+    <div style="display:flex;align-items:flex-end;gap:8px">
+      <button class="btn">Import {{ nrows }} rows</button>
+      <a class="btn sec" href="{{ url_for('data', eid=e.id) }}">Cancel</a>
+    </div>
+  </div>
+  <p class="muted" style="margin-bottom:0;font-size:12px">Currency: if the file has no currency column, every row is treated as
+  <b>{{ acc.currency }}</b> — the account's currency. Map a currency column if the statement mixes currencies.</p>
+</div>
+</form>
+{% endblock %}

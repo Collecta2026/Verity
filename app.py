@@ -14,8 +14,8 @@ import config as appconfig
 from config import Config, DEFAULT_SETTINGS, STARTER_ACCOUNTS
 from models import (db, User, AuditLog, Engagement, Account, Period, QuarterFile,
                     SourceFile, Txn, Match, Split, Balance, Exception_, DocRequest,
-                    DocumentFile, Task, TaskUpdate, ROLES, ROLE_LABELS, TASK_STATUS,
-                    REQ_STATUS, DOC_TYPES)
+                    DocumentFile, Task, TaskUpdate, FxRate, MappingTemplate,
+                    ROLES, ROLE_LABELS, TASK_STATUS, REQ_STATUS, DOC_TYPES)
 import core, ingest, recon, forensics, project, reporting, requests_memo, i18n
 
 app = Flask(__name__)
@@ -239,6 +239,8 @@ def account_map(eid, aid):
 @app.route("/engagement/<int:eid>/data", methods=["GET", "POST"])
 @login_required
 def data(eid):
+    """Step 1 — choose the account and the file. The file is saved and the user
+    is sent to the mapping screen, where they confirm which column is which."""
     e = get_e(eid)
     if request.method == "POST":
         if not current_user.can("lead", "finance_reviewer", "assistant"):
@@ -248,20 +250,112 @@ def data(eid):
         if not file or not file.filename:
             flash("Choose a file.", "error")
             return redirect(url_for("data", eid=eid))
-        raw = file.read()
-        tmp = app.config["UPLOAD_FOLDER"] / f"{eid}_{secure_filename(file.filename)}"
-        tmp.write_bytes(raw)
-        try:
-            sf, n = ingest.ingest_file(e, acc, tmp, file.filename, raw, current_user.email)
-            core.recompute_balances(e)
-            log("source.upload", "source", sf.id, detail=f"{acc.code} {file.filename} {n} rows")
-            flash(f"Loaded {n} rows into {acc.code}.", "ok")
-        except Exception as ex:
-            flash(f"Could not parse: {ex}. Check the column mapping for {acc.code}.", "error")
-        return redirect(url_for("data", eid=eid))
+        safe = f"{eid}_{int(datetime.utcnow().timestamp())}_{secure_filename(file.filename)}"
+        path = app.config["UPLOAD_FOLDER"] / safe
+        path.write_bytes(file.read())
+        return redirect(url_for("map_file", eid=eid, account_id=acc.id,
+                                stored=safe, original=file.filename))
     return render_template("data.html", e=e,
         accounts=Account.query.filter_by(engagement_id=eid, active=True).all(),
-        sources=SourceFile.query.filter_by(engagement_id=eid).order_by(SourceFile.uploaded_at.desc()).all())
+        sources=SourceFile.query.filter_by(engagement_id=eid)
+                 .order_by(SourceFile.uploaded_at.desc()).all(),
+        templates=MappingTemplate.query.filter_by(engagement_id=eid).all())
+
+
+@app.route("/engagement/<int:eid>/map", methods=["GET", "POST"])
+@roles_required("lead", "finance_reviewer", "assistant")
+def map_file(eid):
+    """Step 2 — show the file's real column headers with sample rows and let the
+    user map each one. Mappings can be saved as a reusable template."""
+    e = get_e(eid)
+    stored = request.values.get("stored")
+    original = request.values.get("original", stored)
+    acc = db.session.get(Account, int(request.values["account_id"]))
+    path = app.config["UPLOAD_FOLDER"] / secure_filename(stored or "")
+    if not path.exists():
+        flash("That upload has expired — please upload the file again.", "error")
+        return redirect(url_for("data", eid=eid))
+
+    try:
+        headers, sample, nrows = ingest.preview_headers(path)
+    except Exception as ex:
+        flash(f"Could not read that file: {ex}", "error")
+        return redirect(url_for("data", eid=eid))
+
+    if request.method == "POST" and request.form.get("confirm"):
+        mapping = {f: request.form.get(f"map_{f}") for f in ingest.STD
+                   if request.form.get(f"map_{f}")}
+        if not mapping.get("date"):
+            flash("A date column must be mapped.", "error")
+        elif not (mapping.get("amount_in") or mapping.get("amount_out")
+                  or mapping.get("amount_signed")):
+            flash("Map either money in/out, or a single signed amount column.", "error")
+        else:
+            acc.set_column_map(mapping)
+            db.session.commit()
+            if request.form.get("save_template") and request.form.get("template_name"):
+                tpl = MappingTemplate(engagement_id=eid, name=request.form["template_name"][:150],
+                                      account_id=acc.id, sample_headers=", ".join(headers)[:2000],
+                                      created_by=current_user.name)
+                tpl.set_mapping(mapping)
+                db.session.add(tpl)
+                db.session.commit()
+                log("mapping.save", "mapping", tpl.id, detail=tpl.name)
+            try:
+                sf, n = ingest.ingest_file(e, acc, path, original, path.read_bytes(),
+                                           current_user.email)
+                core.recompute_balances(e)
+                log("source.upload", "source", sf.id,
+                    detail=f"{acc.code} {original} {n} rows")
+                flash(f"Loaded {n} rows into {acc.code}.", "ok")
+                path.unlink(missing_ok=True)
+                return redirect(url_for("data", eid=eid))
+            except Exception as ex:
+                flash(f"Import failed: {ex}", "error")
+
+    tpl_id = request.values.get("template_id", type=int)
+    if tpl_id:
+        tpl = db.session.get(MappingTemplate, tpl_id)
+        current = tpl.mapping() if tpl else {}
+    else:
+        current = acc.column_map() or ingest.guess_mapping(headers, acc.kind)
+    return render_template("map.html", e=e, acc=acc, headers=headers, sample=sample,
+        nrows=nrows, stored=stored, original=original, mapping=current,
+        fields=ingest.STD, labels=ingest.FIELD_LABELS,
+        templates=MappingTemplate.query.filter_by(engagement_id=eid).all())
+
+
+@app.route("/engagement/<int:eid>/fx", methods=["GET", "POST"])
+@login_required
+def fx(eid):
+    """Month-end rates used to state foreign-currency figures in the base
+    currency for reporting. Matching never uses them."""
+    e = get_e(eid)
+    if request.method == "POST":
+        if not current_user.can("lead", "finance_reviewer", "assistant"):
+            abort(403)
+        f = request.form
+        ccy, month = f["currency"].strip().upper(), f["month"]
+        r = FxRate.query.filter_by(engagement_id=eid, currency=ccy, month=month).first()
+        before = r.rate if r else None
+        if not r:
+            r = FxRate(engagement_id=eid, currency=ccy, month=month)
+            db.session.add(r)
+        r.rate = float(f["rate"])
+        r.source = f.get("source", "")[:200]
+        r.entered_by = current_user.name
+        db.session.commit()
+        n = core.reprice(e)
+        log("fx.save", "fx", f"{ccy} {month}", before=str(before), after=str(r.rate))
+        flash(f"Rate saved. {n} transaction(s) restated in {e.currency}.", "ok")
+        return redirect(url_for("fx", eid=eid, currency=ccy))
+    ccy = request.args.get("currency", "USD").upper()
+    rates = {r.month: r for r in FxRate.query.filter_by(engagement_id=eid, currency=ccy).all()}
+    used = sorted({t[0] for t in db.session.query(Txn.currency)
+                   .filter_by(engagement_id=eid).distinct().all() if t[0]})
+    return render_template("fx.html", e=e, currency=ccy, rates=rates, used=used,
+        periods=Period.query.filter_by(engagement_id=eid).order_by(Period.month).all(),
+        missing=core.missing_rates(eid))
 
 
 # ----------------------------------------------------------------- balances

@@ -12,6 +12,28 @@ Arabic switches the whole application to right-to-left. Document request memos c
 produced in either language independently of the interface language, so an Arabic memo can
 be sent to an Arabic-speaking recipient while you work in English.
 
+## Multi-currency
+Each account carries its own currency (EGP, USD, or any other), and every transaction keeps the
+currency it was recorded in.
+
+- **Matching never crosses currencies.** A USD payment is only ever matched against a USD entry —
+  even with an identical amount, reference and date. Matching across currencies would manufacture
+  false clearances, so the engine treats currency as part of the match key.
+- **Exchange rates are for reporting only.** Enter month-end rates per currency under
+  *Exchange rates*, with a note of where each came from. Figures are then also stated in the
+  engagement's base currency so totals and authorisation thresholds can be compared. A month
+  with no rate falls back to the last known rate; anything still unpriced is listed rather than
+  guessed.
+- **Thresholds apply in the base currency**, so a USD payment is tested against your EGP
+  authorisation limits on its converted value.
+
+## Uploading transaction files
+Uploads are a two-step flow: choose the account and file, then a mapping screen shows the file's
+real column headers with sample rows and asks which is which. Best guesses are filled in
+automatically (including single signed-amount columns, currency columns and Arabic headers).
+Nothing is imported until you approve the mapping, and a mapping can be saved by name and reused
+for that statement layout each month.
+
 ## What it does
 - **Any accounts** — CIB, NBE, Vodafone Cash, InstaPay and the ledger are set up by default;
   add any number of further banks, wallets or ledgers at any time, each with its own column mapping.

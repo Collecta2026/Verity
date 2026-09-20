@@ -12,7 +12,7 @@
 <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
 <div><b class="mono">{{ x.ref }}</b> · {{ tv(x.category) }} ·
 <span class="badge {{ 'b-ok' if x.status=='Cleared' else ('b-bad' if x.status=='Unresolved' else 'b-warn') }}">{{ tv(x.status) }}</span><br>
-<span class="muted">{{ x.date }} · {{ x.counterparty }} · {{ e.currency }} {{ '{:,.2f}'.format(x.amount or 0) }}</span><br>
+<span class="muted">{{ x.date }} · {{ x.counterparty }} · <b>{{ x.currency or e.currency }} {{ '{:,.2f}'.format(x.amount or 0) }}</b>{% if x.currency and x.currency != e.currency %} <span class="badge b-mut">= {{ e.currency }} {{ '{:,.0f}'.format(x.base_amount) if x.base_amount else '?' }}</span>{% endif %}</span><br>
 <span class="muted" style="font-size:12px">{{ x.detail }}</span>
 {% if x.resolution %}<br><span class="muted" style="font-size:12px">Resolution: {{ x.resolution }}</span>{% endif %}
 {% if x.requests %}<br>{% for r in x.requests %}<a class="badge b-mut mono" href="{{ url_for('request_memo', eid=e.id, rid=r.id) }}" target="_blank">{{ r.ref }} · {{ tv(r.status) }}</a> {% endfor %}{% endif %}

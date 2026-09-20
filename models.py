@@ -155,8 +155,12 @@ class Txn(db.Model):
     description = db.Column(db.String(400))
     counterparty = db.Column(db.String(300))
     counterparty_id = db.Column(db.String(120), index=True)
-    amount_in = db.Column(db.Float, default=0.0)
+    currency = db.Column(db.String(10), index=True)     # the transaction's own currency
+    amount_in = db.Column(db.Float, default=0.0)        # as stated, in `currency`
     amount_out = db.Column(db.Float, default=0.0)
+    fx_rate = db.Column(db.Float)                       # to engagement base currency
+    base_in = db.Column(db.Float, default=0.0)          # converted, for reporting only
+    base_out = db.Column(db.Float, default=0.0)
     reference = db.Column(db.String(200))
     gl_ref = db.Column(db.String(120))
     matched = db.Column(db.Boolean, default=False, index=True)
@@ -174,6 +178,7 @@ class Match(db.Model):
     confidence = db.Column(db.Integer)
     date_gap_days = db.Column(db.Integer)
     amount = db.Column(db.Float)
+    currency = db.Column(db.String(10))
     direction = db.Column(db.String(4))
     bank_txn_id = db.Column(db.Integer)
     ledger_txn_id = db.Column(db.Integer)
@@ -200,6 +205,7 @@ class Balance(db.Model):
     account_id = db.Column(db.Integer, db.ForeignKey("accounts.id"), index=True)
     month = db.Column(db.String(7), index=True)
     quarter = db.Column(db.String(12))
+    currency = db.Column(db.String(10))
     opening = db.Column(db.Float, default=0.0)
     closing = db.Column(db.Float, default=0.0)
     computed_movement = db.Column(db.Float, default=0.0)
@@ -223,6 +229,8 @@ class Exception_(db.Model):
     date = db.Column(db.Date)
     counterparty = db.Column(db.String(300))
     amount = db.Column(db.Float)
+    currency = db.Column(db.String(10))
+    base_amount = db.Column(db.Float)
     detail = db.Column(db.Text)
     status = db.Column(db.String(20), default="Open", index=True)
     resolution = db.Column(db.Text)
@@ -272,6 +280,43 @@ class DocumentFile(db.Model):
     sha256 = db.Column(db.String(64))
     uploaded_by = db.Column(db.String(200))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FxRate(db.Model):
+    """Month-end rate used to express a foreign-currency figure in the base
+    currency for reporting. Never used for matching — a USD payment is only ever
+    matched against a USD entry."""
+    __tablename__ = "fx_rates"
+    id = db.Column(db.Integer, primary_key=True)
+    engagement_id = db.Column(db.Integer, db.ForeignKey("engagements.id"), index=True)
+    currency = db.Column(db.String(10), index=True)
+    month = db.Column(db.String(7), index=True)
+    rate = db.Column(db.Float)          # 1 unit of `currency` = rate x base currency
+    source = db.Column(db.String(200))  # where the rate came from — evidence matters
+    entered_by = db.Column(db.String(120))
+    entered_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class MappingTemplate(db.Model):
+    """A saved column mapping for a statement layout, so the same bank export can
+    be loaded month after month without re-mapping it."""
+    __tablename__ = "mapping_templates"
+    id = db.Column(db.Integer, primary_key=True)
+    engagement_id = db.Column(db.Integer, db.ForeignKey("engagements.id"), index=True)
+    name = db.Column(db.String(150))
+    account_id = db.Column(db.Integer, db.ForeignKey("accounts.id"))
+    mapping_json = db.Column(db.Text)
+    sample_headers = db.Column(db.Text)
+    created_by = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    account = db.relationship("Account")
+
+    def mapping(self):
+        return json.loads(self.mapping_json or "{}")
+
+    def set_mapping(self, d):
+        self.mapping_json = json.dumps(d)
 
 
 class Task(db.Model):

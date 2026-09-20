@@ -23,7 +23,7 @@
 <tr><th>{{ t('lbl.ref') }}</th><th>{{ t('lbl.category') }}</th><th>{{ t('lbl.date') }}</th><th>{{ t('lbl.counterparty') }}</th><th>{{ t('lbl.amount') }}</th><th>{{ t('lbl.status') }}</th><th></th></tr>
 {% for x in exceptions %}<tr>
 <td class="mono">{{ x.ref }}</td><td>{{ tv(x.category) }}</td><td>{{ x.date }}</td><td>{{ x.counterparty }}</td>
-<td class="right">{{ '{:,.0f}'.format(x.amount or 0) }}</td>
+<td class="right">{{ '{:,.0f}'.format(x.amount or 0) }} <span class="muted" style="font-size:11px">{{ x.currency or e.currency }}</span></td>
 <td><span class="badge {{ 'b-ok' if x.status=='Cleared' else ('b-bad' if x.status=='Unresolved' else 'b-warn') }}">{{ tv(x.status) }}</span></td>
 <td class="right"><a class="btn sm sec" href="{{ url_for('exceptions', eid=e.id, quarter=quarter) }}">Manage</a></td></tr>
 {% else %}<tr><td colspan="7" class="muted">{{ t('q.runfirst') }}</td></tr>{% endfor %}
