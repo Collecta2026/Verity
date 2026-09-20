@@ -1,0 +1,55 @@
+{% extends 'base.html' %}{% block heading %}Dashboard{% endblock %}
+{% block content %}
+{% if e %}
+<h1>{{ e.name }}</h1><p class="sub">{{ e.client }} · {{ e.currency }} · records {{ e.period_start }} to {{ e.period_end }}</p>
+<div class="grid g4">
+  <div class="stat"><div class="n">{{ prog.months_done }}/{{ prog.months_total }}</div><div class="l">{{ t('dash.monthsrec') }}</div></div>
+  <div class="stat"><div class="n">{{ prog.avg_progress }}%</div><div class="l">{{ t('dash.avgprogress') }}</div></div>
+  <div class="stat {{ 'bad' if prog.open_exceptions else '' }}"><div class="n">{{ prog.open_exceptions }}</div><div class="l">{{ t('dash.openexc') }}</div></div>
+  <div class="stat warn"><div class="n">{{ prog.open_requests }}</div><div class="l">{{ t('dash.openreq') }}</div></div>
+</div>
+<div class="card" style="margin-top:16px">
+  <b>Project window</b> <span class="muted">{{ e.project_start }} → {{ e.project_end }}{% if prog.days_left is not none %} · {{ prog.days_left }} days remaining{% endif %}</span>
+  <div style="margin-top:8px"><span class="muted" style="font-size:12px">Time elapsed</span>
+  <div class="pbar"><span style="width:{{ prog.elapsed_pct }}%"></span></div></div>
+  <div style="margin-top:8px"><span class="muted" style="font-size:12px">Work completed</span>
+  <div class="pbar ok"><span style="width:{{ prog.avg_progress }}%"></span></div></div>
+  {% if prog.overdue %}<p style="margin:10px 0 0"><span class="badge b-bad">{{ prog.overdue }} task(s) overdue</span></p>{% endif %}
+</div>
+<h2>{{ t('dash.mytasks') }}</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.ref') }}</th><th>{{ t('lbl.task') }}</th><th>{{ t('lbl.due') }}</th><th>{{ t('lbl.status') }}</th><th>{{ t('lbl.progress') }}</th><th></th></tr>
+{% for t in mytasks %}<tr>
+<td class="mono">{{ t.ref }}</td><td>{{ t.title }}{% if t.joint_owner %} <span class="badge b-mut">joint</span>{% endif %}</td>
+<td class="{{ 'overdue' if t.overdue }}">{{ t.due_date }}</td>
+<td><span class="badge {{ 'b-ok' if t.status=='Done' else ('b-warn' if t.status=='Blocked' else 'b-mut') }}">{{ tv(t.status) }}</span></td>
+<td><div class="pbar sm"><span style="width:{{ t.progress }}%"></span></div></td>
+<td class="right"><a class="btn sm sec" href="{{ url_for('tasks', eid=e.id, mine=1) }}">Update</a></td></tr>
+{% else %}<tr><td colspan="6" class="muted">{{ t('dash.notasks') }}</td></tr>{% endfor %}
+</table></div>
+<h2>{{ t('dash.quarters') }}</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.quarter') }}</th><th>{{ t('lbl.months') }}</th><th>{{ t('st.reconciled') }}</th><th>{{ t('lbl.status') }}</th><th></th></tr>
+{% for q in quarters %}<tr><td><b>{{ q.quarter }}</b></td><td class="muted">{{ q.months|join(', ') }}</td>
+<td>{{ q.done }}/{{ q.months|length }}</td>
+<td><span class="badge {{ 'b-ok' if q.status=='Signed off' else ('b-warn' if q.status=='In progress' else 'b-mut') }}">{{ tv(q.status) }}</span></td>
+<td class="right"><a class="btn sm" href="{{ url_for('quarter', eid=e.id, quarter=q.quarter) }}">Open</a></td></tr>{% endfor %}
+</table></div>
+{% else %}
+<h1>Create an investigation</h1><p class="sub">Set the records period and the project window.</p>
+{% endif %}
+{% if current_user.can('lead','finance_reviewer') %}
+<h2>{{ t('dash.newinv') }}</h2>
+<div class="card"><form method="post" action="{{ url_for('create_engagement') }}">
+  <div class="row"><div><label>Name</label><input name="name" required></div>
+  <div><label>{{ t('lbl.client') }}</label><input name="client"></div>
+  <div><label>Code (for references)</label><input name="code" value="SGE"></div>
+  <div><label>{{ t('lbl.currency') }}</label><input name="currency" value="EGP"></div></div>
+  <div class="row"><div><label>{{ t('dash.recordsfrom') }}</label><input type="date" name="period_start" value="2023-05-01"></div>
+  <div><label>{{ t('dash.recordsto') }}</label><input type="date" name="period_end" value="2026-06-30"></div>
+  <div><label>{{ t('dash.projstart') }}</label><input type="date" name="project_start" value="2026-09-21"></div>
+  <div><label>{{ t('dash.projend') }}</label><input type="date" name="project_end" value="2026-10-23"></div></div>
+  <button class="btn" style="margin-top:12px">Create</button>
+</form></div>
+{% endif %}
+{% endblock %}

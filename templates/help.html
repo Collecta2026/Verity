@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% block heading %}Help{% endblock %}
+{% block content %}
+<h1>How Verity works</h1>
+<div class="card">
+<p>Verity reconciles what the ledger records against what actually moved through the bank and wallet accounts, quarter by quarter and month by month, then chases the documents needed to clear whatever doesn't agree.</p>
+<h2>The workflow</h2>
+<ol style="line-height:1.9">
+<li><b>Accounts</b> — set up every bank, wallet and ledger source. Add more at any time.</li>
+<li><b>Upload data</b> — statements and ledger extracts. Each file is hashed; transactions are filed into their own month automatically.</li>
+<li><b>Balances</b> — enter opening and closing figures. The system checks the statement foots, each opening agrees to the prior closing, and no period is missing.</li>
+<li><b>Reconcile a quarter</b> — runs each month through the match cascade: reference exact, reference fuzzy, value plus date plus party, value plus date, description similarity, then split and aggregation. Every match records how it matched.</li>
+<li><b>Exceptions</b> — everything unmatched or suspicious gets an automatic reference and enters the clearance queue.</li>
+<li><b>Document requests</b> — raise a referenced request against any exception, print or email the memo, chase it, record the response. Accepting the documents clears the exception.</li>
+<li><b>Quarter rationale</b> — write the analysis, sign it off, and it locks into the cumulative case file.</li>
+</ol>
+<h2>References</h2>
+<p>Everything is referenced for later retrieval: exceptions as <span class="mono">{{ e.code if e else 'SGE' }}-Q2-23-EXC-0001</span>, requests as <span class="mono">-DR-0001</span>, documents as <span class="mono">-DOC-000001</span>, tasks as <span class="mono">-T-0001</span>.</p>
+<h2>Roles</h2>
+<p><b>Forensic Lead</b> and <b>Finance Reviewer</b> run reconciliations, sign off quarters, assign tasks and clear exceptions. <b>Assistants</b> upload data, enter balances, chase requests and file documents. <b>Viewers</b> read only. <b>Administrators</b> manage users. Every action is written to the audit trail with its before and after value.</p>
+<p class="muted">A missing document is a gap to be explained, not proof of wrongdoing on its own. Put each material item to the individual concerned for a response before drawing conclusions.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}{% block heading %}Team &amp; activity{% endblock %}
+{% block content %}
+<h1>Team &amp; activity</h1><p class="sub">Who holds what, how far along they are, and when they were last active. Roles set what each person can do.</p>
+<div class="grid g4">
+ <div class="stat"><div class="n">{{ prog.avg_progress }}%</div><div class="l">{{ t('team.overall') }}</div></div>
+ <div class="stat"><div class="n">{{ prog.elapsed_pct }}%</div><div class="l">{{ t('team.elapsed') }}</div></div>
+ <div class="stat {{ 'bad' if prog.overdue }}"><div class="n">{{ prog.overdue }}</div><div class="l">Overdue tasks</div></div>
+ <div class="stat warn"><div class="n">{{ prog.open_requests }}</div><div class="l">Open requests</div></div>
+</div>
+<h2>{{ t('team.matrix') }}</h2>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.role') }}</th><th>{{ t('lbl.title') }}</th><th>{{ t('task.title') }}</th><th>{{ t('lbl.done') }}</th><th>{{ t('lbl.inprogress') }}</th><th>{{ t('lbl.blocked') }}</th><th>{{ t('task.overdue') }}</th><th>{{ t('lbl.progress') }}</th><th>{{ t('lbl.requests') }}</th><th>{{ t('team.lastactive') }}</th></tr>
+{% for r in rows %}<tr>
+<td><b>{{ r.user.name }}</b><br><span class="muted" style="font-size:12px">{{ r.user.email }}</span></td>
+<td><span class="badge b-mut">{{ tv(r.user.role_label) }}</span></td><td class="muted">{{ r.user.title or '—' }}</td>
+<td>{{ r.tasks }}</td><td>{{ r.done }}</td><td>{{ r.in_progress }}</td>
+<td>{% if r.blocked %}<span class="badge b-bad">{{ r.blocked }}</span>{% else %}0{% endif %}</td>
+<td>{% if r.overdue %}<span class="badge b-bad">{{ r.overdue }}</span>{% else %}0{% endif %}</td>
+<td><div class="pbar sm"><span style="width:{{ r.avg }}%"></span></div></td>
+<td>{{ r.requests }}{% if r.requests_overdue %} <span class="badge b-bad">{{ r.requests_overdue }} late</span>{% endif %}</td>
+<td class="muted">{{ r.last_active.strftime('%d %b %H:%M') if r.last_active else '—' }}</td></tr>{% endfor %}
+</table></div>
+<p class="muted" style="font-size:12px">Role permissions — Forensic Lead and Finance Reviewer: run reconciliations, sign off quarters, assign and reassign tasks, clear exceptions. Assistant: upload data, enter balances, raise and chase requests, file documents, update own tasks. Viewer: read only. Administrator: user management.</p>
+{% endblock %}

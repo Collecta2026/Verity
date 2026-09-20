@@ -1,0 +1,44 @@
+{% extends 'base.html' %}{% block heading %}Tasks{% endblock %}
+{% block content %}
+<h1>{{ t('task.title') }}</h1><p class="sub">Work programme {{ e.project_start }} → {{ e.project_end }}. Tasks can be reassigned or shared between two people at any time.</p>
+<div class="grid g4">
+ <div class="stat"><div class="n">{{ prog.done }}/{{ prog.tasks }}</div><div class="l">{{ t('task.complete') }}</div></div>
+ <div class="stat"><div class="n">{{ prog.avg_progress }}%</div><div class="l">{{ t('task.avgprogress') }}</div></div>
+ <div class="stat {{ 'bad' if prog.overdue }}"><div class="n">{{ prog.overdue }}</div><div class="l">{{ t('task.overdue') }}</div></div>
+ <div class="stat"><div class="n">{{ prog.days_left if prog.days_left is not none else '—' }}</div><div class="l">{{ t('task.daysleft') }}</div></div>
+</div>
+<div class="card" style="margin-top:14px"><form method="get" style="display:flex;gap:10px;align-items:flex-end">
+<div><label>{{ t('lbl.status') }}</label><select name="status" onchange="this.form.submit()"><option value="">All</option>
+{% for s in TASK_STATUS %}<option {{ 'selected' if request.args.get('status')==s }}>{{ tv(s) }}</option>{% endfor %}</select></div>
+<div style="display:flex;align-items:flex-end"><a class="btn sec sm" href="{{ url_for('tasks', eid=e.id, mine=1) }}">Only mine</a>
+<a class="btn sec sm" href="{{ url_for('tasks', eid=e.id) }}" style="margin-left:6px">All</a></div>
+</form></div>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.ref') }}</th><th>{{ t('task.phase') }}</th><th>{{ t('lbl.task') }}</th><th>{{ t('lbl.owner') }}</th><th>{{ t('lbl.joint') }}</th><th>{{ t('lbl.due') }}</th><th>{{ t('lbl.status') }}</th><th>%</th><th>{{ t('act.update') }}</th></tr>
+{% for t in items %}<tr class="{{ 'rowbad' if t.overdue }}">
+<td class="mono">{{ t.ref }}</td><td class="muted">{{ t.phase }}</td><td>{{ t.title }}</td>
+<td class="muted">{{ t.owner.name if t.owner else '—' }}</td><td class="muted">{{ t.joint_owner.name if t.joint_owner else '—' }}</td>
+<td class="{{ 'overdue' if t.overdue }}">{{ t.due_date }}</td>
+<td><span class="badge {{ 'b-ok' if t.status=='Done' else ('b-bad' if t.status=='Blocked' else 'b-warn' if t.status=='In progress' else 'b-mut') }}">{{ tv(t.status) }}</span></td>
+<td><div class="pbar sm"><span style="width:{{ t.progress }}%"></span></div></td>
+<td><form method="post" action="{{ url_for('update_task', eid=e.id, tid=t.id) }}" style="display:flex;gap:3px;flex-wrap:wrap">
+<select name="status" style="width:auto">{% for s in TASK_STATUS %}<option {{ 'selected' if t.status==s }}>{{ tv(s) }}</option>{% endfor %}</select>
+<input name="progress" value="{{ t.progress }}" style="width:48px">
+{% if current_user.can('lead','finance_reviewer') %}
+<select name="owner" style="width:auto"><option value="">owner…</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if t.owner_id==u.id }}>{{ u.name }}</option>{% endfor %}</select>
+<select name="joint_owner" style="width:auto"><option value="">joint…</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if t.joint_owner_id==u.id }}>{{ u.name }}</option>{% endfor %}</select>
+{% endif %}
+<input name="note" placeholder="note" style="width:100px"><button class="btn sm">Save</button></form></td></tr>
+{% endfor %}</table></div>
+{% if current_user.can('lead','finance_reviewer') %}
+<h2>{{ t('task.add') }}</h2>
+<div class="card"><form method="post"><div class="row">
+<div style="flex:2"><label>Title</label><input name="title" required></div>
+<div><label>{{ t('task.phase') }}</label><input name="phase" value="Ad hoc"></div>
+<div><label>{{ t('lbl.owner') }}</label><select name="owner"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></div>
+<div><label>Joint owner</label><select name="joint_owner"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></div>
+<div><label>Start</label><input type="date" name="start_date"></div>
+<div><label>Due</label><input type="date" name="due_date"></div>
+</div><button class="btn" style="margin-top:12px">Add task</button></form></div>
+{% endif %}
+{% endblock %}

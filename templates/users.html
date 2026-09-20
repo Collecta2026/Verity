@@ -1,0 +1,26 @@
+{% extends 'base.html' %}{% block heading %}Users{% endblock %}
+{% block content %}
+<h1>Users &amp; roles</h1><p class="sub">Add team members and set what they can do. Every action they take is written to the audit trail.</p>
+<div class="card"><form method="post"><div class="row">
+<div><label>Name</label><input name="name" required></div>
+<div><label>Email</label><input name="email" type="email" required></div>
+<div><label>{{ t('lbl.title') }}</label><input name="title" placeholder="Finance Manager"></div>
+<div><label>{{ t('lbl.role') }}</label><select name="role">{% for r in ROLES %}<option value="{{ r }}">{{ tv(ROLE_LABELS[r]) }}</option>{% endfor %}</select></div>
+<div><label>Password</label><input name="password" required></div>
+<div style="display:flex;align-items:flex-end"><button class="btn">{{ t('usr.adduser') }}</button></div>
+</div></form></div>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.email') }}</th><th>{{ t('lbl.title') }}</th><th>{{ t('lbl.role') }}</th><th>{{ t('lbl.status') }}</th><th>{{ t('usr.change') }}</th></tr>
+{% for u in users %}<tr>
+<td><b>{{ u.name }}</b></td><td>{{ u.email }}</td><td class="muted">{{ u.title or '—' }}</td>
+<td>{{ tv(u.role_label) }}</td>
+<td>{% if u.active %}<span class="badge b-ok">{{ t('st.active') }}</span>{% else %}<span class="badge b-mut">{{ t('st.disabled') }}</span>{% endif %}</td>
+<td><form method="post" action="{{ url_for('edit_user', uid=u.id) }}" style="display:flex;gap:4px;flex-wrap:wrap">
+<select name="role" style="width:auto">{% for r in ROLES %}<option value="{{ r }}" {{ 'selected' if u.role==r }}>{{ tv(ROLE_LABELS[r]) }}</option>{% endfor %}</select>
+<input name="title" value="{{ u.title or '' }}" placeholder="title" style="width:120px">
+<input name="password" placeholder="new password" style="width:120px">
+<button class="btn sm">Save</button>
+<button class="btn sm sec" name="toggle" value="1">{{ t('usr.disable') if u.active else t('usr.enable') }}</button>
+</form></td></tr>{% endfor %}
+</table></div>
+{% endblock %}

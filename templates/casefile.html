@@ -1,0 +1,20 @@
+{% extends 'base.html' %}{% block heading %}Case file{% endblock %}
+{% block content %}
+<h1>Quarters &amp; cumulative case file</h1>
+<p class="sub">The running record from {{ e.period_start }} to {{ e.period_end }}. Each quarter's rationale is locked on sign-off and rolls into this file.</p>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.quarter') }}</th><th>{{ t('lbl.months') }}</th><th>{{ t('lbl.status') }}</th><th>{{ t('exc.title') }}</th><th>{{ t('lbl.open') }}</th><th>{{ t('q.valueatrisk') }}</th><th>{{ t('lbl.signedoff') }}</th><th></th></tr>
+{% for q in quarters %}<tr>
+<td><b>{{ q.quarter }}</b></td><td class="muted">{{ q.done }}/{{ q.months|length }}</td>
+<td><span class="badge {{ 'b-ok' if q.status=='Signed off' else ('b-warn' if q.status=='In progress' else 'b-mut') }}">{{ tv(q.status) }}</span></td>
+<td>{{ q.exceptions }}</td><td>{{ q.open }}</td>
+<td class="right">{{ '{:,.0f}'.format(q.file.value_at_risk) if q.file else '—' }}</td>
+<td class="muted">{{ q.file.signed_off_by if q.file and q.file.locked else '' }}</td>
+<td class="right"><a class="btn sm" href="{{ url_for('quarter', eid=e.id, quarter=q.quarter) }}">Open</a></td></tr>{% endfor %}
+</table></div>
+{% for q in quarters %}{% if q.file and q.file.narrative %}
+<h2>{{ q.quarter }}</h2>
+<div class="card"><p style="white-space:pre-wrap;margin:0">{{ q.file.narrative }}</p>
+{% if q.file.locked %}<p class="muted" style="margin:10px 0 0;font-size:12px">Signed off by {{ q.file.signed_off_by }} on {{ q.file.signed_off_at.strftime('%d %b %Y') }}</p>{% endif %}</div>
+{% endif %}{% endfor %}
+{% endblock %}

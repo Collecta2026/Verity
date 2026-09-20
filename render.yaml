@@ -1,0 +1,20 @@
+# Render Blueprint — same pattern as Collecta / Time.
+# Database is Neon Postgres (external): set DATABASE_URL in the dashboard to the
+# Neon connection string (region London), keep it out of the repo.
+services:
+  - type: web
+    name: verity
+    runtime: python
+    region: frankfurt
+    plan: starter          # always-on, so no cold starts mid-session
+    buildCommand: pip install -r requirements.txt psycopg2-binary
+    startCommand: gunicorn wsgi:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false        # paste the Neon connection string here in the dashboard
+      - key: SEED_DEMO
+        value: "0"         # set to "1" once to load the demo engagement, then back to "0"

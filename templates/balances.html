@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% block heading %}Balances{% endblock %}
+{% block content %}
+<h1>{{ t('bal.title') }}</h1>
+<p class="sub">Enter each month's stated opening and closing balance. The system checks that the statement foots, that each opening agrees to the prior closing, and that no period is missing — the first test of whether the records are complete.</p>
+<div class="card"><form method="get" style="display:flex;gap:10px;align-items:flex-end">
+  <div style="flex:1"><label>Account</label><select name="account_id" onchange="this.form.submit()">
+  {% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if a.id==aid }}>{{ a.code }} — {{ a.name }}</option>{% endfor %}</select></div>
+</form></div>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.month') }}</th><th>{{ t('bal.opening') }}</th><th>{{ t('bal.closing') }}</th><th>{{ t('bal.movement') }}</th><th>{{ t('bal.variance') }}</th><th>{{ t('bal.continuity') }}</th><th>{{ t('bal.anomaly') }}</th>{% if current_user.can('lead','finance_reviewer','assistant') %}<th></th>{% endif %}</tr>
+{% for p in periods %}{% set b = bal.get(p.month) %}
+<tr class="{{ 'rowbad' if b and b.anomaly }}">
+<td><b>{{ p.month }}</b></td>
+<td class="right">{{ '{:,.2f}'.format(b.opening) if b else '—' }}</td>
+<td class="right">{{ '{:,.2f}'.format(b.closing) if b else '—' }}</td>
+<td class="right muted">{{ '{:,.2f}'.format(b.computed_movement) if b else '—' }}</td>
+<td class="right">{% if b and b.variance|abs > 0.01 %}<span class="badge b-bad">{{ '{:,.2f}'.format(b.variance) }}</span>{% elif b %}<span class="badge b-ok">ok</span>{% else %}—{% endif %}</td>
+<td class="right">{% if b and b.continuity_gap|abs > 0.01 %}<span class="badge b-bad">{{ '{:,.2f}'.format(b.continuity_gap) }}</span>{% elif b %}<span class="badge b-ok">ok</span>{% else %}—{% endif %}</td>
+<td class="muted" style="font-size:12px">{{ b.anomaly if b and b.anomaly else '' }}</td>
+{% if current_user.can('lead','finance_reviewer','assistant') %}
+<td><form method="post" style="display:flex;gap:4px">
+<input type="hidden" name="account_id" value="{{ aid }}"><input type="hidden" name="month" value="{{ p.month }}">
+<input name="opening" style="width:100px" value="{{ b.opening if b else '' }}" placeholder="opening">
+<input name="closing" style="width:100px" value="{{ b.closing if b else '' }}" placeholder="closing">
+<button class="btn sm">Save</button></form></td>{% endif %}
+</tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'base.html' %}{% block heading %}{{ quarter }}{% endblock %}
+{% block content %}
+<h1>{{ quarter }}</h1><p class="sub">{{ months|length }} month(s): {{ months|map(attribute='month')|join(', ') }}</p>
+<div class="grid g4">
+  <div class="stat"><div class="n">{{ stats.matched }}</div><div class="l">{{ t('ov.matched') }}</div></div>
+  <div class="stat"><div class="n">{{ stats.splits }}</div><div class="l">{{ t('ov.splits') }}</div></div>
+  <div class="stat bad"><div class="n">{{ stats.open }}</div><div class="l">{{ t('dash.openexc') }}</div></div>
+  <div class="stat"><div class="n">{{ '{:,.0f}'.format(stats.value) }}</div><div class="l">{{ t('ov.valueunresolved') }}</div></div>
+</div>
+{% if current_user.can('lead','finance_reviewer') %}
+<div class="card" style="margin-top:16px"><form method="post" action="{{ url_for('run_quarter', eid=e.id, quarter=quarter) }}">
+<b>Reconcile this quarter</b> <span class="muted">— runs each month in turn through the match cascade, then raises exceptions.</span>
+<button class="btn" style="margin-left:10px">Run {{ quarter }}</button></form></div>
+{% endif %}
+<h2>{{ t('lbl.months') }}</h2>
+<div class="card" style="padding:0"><table><tr><th>{{ t('lbl.month') }}</th><th>{{ t('lbl.from') }}</th><th>{{ t('lbl.to') }}</th><th>{{ t('lbl.status') }}</th><th>{{ t('lbl.signedoff') }}</th></tr>
+{% for p in months %}<tr><td><b>{{ p.month }}</b></td><td>{{ p.start }}</td><td>{{ p.end }}</td>
+<td><span class="badge {{ 'b-ok' if p.status=='Signed off' else ('b-warn' if p.status=='Reconciled' else 'b-mut') }}">{{ tv(p.status) }}</span></td>
+<td class="muted">{{ p.signed_off_by or '' }}</td></tr>{% endfor %}</table></div>
+
+<h2>{{ t('q.excin') }}</h2>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.ref') }}</th><th>{{ t('lbl.category') }}</th><th>{{ t('lbl.date') }}</th><th>{{ t('lbl.counterparty') }}</th><th>{{ t('lbl.amount') }}</th><th>{{ t('lbl.status') }}</th><th></th></tr>
+{% for x in exceptions %}<tr>
+<td class="mono">{{ x.ref }}</td><td>{{ tv(x.category) }}</td><td>{{ x.date }}</td><td>{{ x.counterparty }}</td>
+<td class="right">{{ '{:,.0f}'.format(x.amount or 0) }}</td>
+<td><span class="badge {{ 'b-ok' if x.status=='Cleared' else ('b-bad' if x.status=='Unresolved' else 'b-warn') }}">{{ tv(x.status) }}</span></td>
+<td class="right"><a class="btn sm sec" href="{{ url_for('exceptions', eid=e.id, quarter=quarter) }}">Manage</a></td></tr>
+{% else %}<tr><td colspan="7" class="muted">{{ t('q.runfirst') }}</td></tr>{% endfor %}
+</table></div>
+
+<h2>Benford's Law — this quarter</h2>
+<div class="card"><table><tr><th>{{ t('bf.digit') }}</th><th>{{ t('bf.observed') }}</th><th>{{ t('bf.observedpct') }}</th><th>{{ t('bf.expectedpct') }}</th><th>{{ t('bf.excess') }}</th></tr>
+{% for b in benford %}<tr><td>{{ b.digit }}</td><td>{{ b.observed }}</td><td>{{ b.observed_pct }}</td><td>{{ b.benford_pct }}</td>
+<td><span class="badge {{ 'b-bad' if b.excess>3 else ('b-warn' if b.excess>1 else 'b-mut') }}">{{ '%+.1f'|format(b.excess) }}</span></td></tr>{% endfor %}
+</table></div>
+
+<h2>{{ t('q.rationale') }}</h2>
+<div class="card">
+{% if qf and qf.locked %}
+<p><span class="badge b-ok">Signed off</span> by {{ qf.signed_off_by }} on {{ qf.signed_off_at.strftime('%d %b %Y') }} — locked.</p>
+<p style="white-space:pre-wrap">{{ qf.narrative }}</p>
+{% elif current_user.can('lead','finance_reviewer') %}
+<form method="post" action="{{ url_for('quarter_narrative', eid=e.id, quarter=quarter) }}">
+<label>What was reconciled, what cleared and on what evidence, what remains unexplained</label>
+<textarea name="narrative" rows="8">{{ qf.narrative if qf else '' }}</textarea>
+<div class="row" style="margin-top:10px"><div><label>Value at risk ({{ e.currency }})</label>
+<input name="value_at_risk" value="{{ qf.value_at_risk if qf else 0 }}"></div>
+<div style="display:flex;align-items:flex-end;gap:8px">
+<button class="btn sec">{{ t('q.savedraft') }}</button>
+<button class="btn" name="signoff" value="1" onclick="return confirm('Sign off and lock {{ quarter }}? This cannot be undone.')">{{ t('q.signoff') }}</button></div></div>
+</form>
+{% else %}<p class="muted">{{ qf.narrative if qf else 'Not yet written.' }}</p>{% endif %}
+</div>
+{% endblock %}

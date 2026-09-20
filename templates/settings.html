@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% block heading %}Settings{% endblock %}
+{% block content %}
+<h1>{{ t('set.title') }}</h1><p class="sub">Matching tolerances, thresholds, watchlist and project dates. Applied on the next run.</p>
+<form method="post"><div class="card">
+<h2 style="margin-top:0">{{ t('dash.window') }}</h2>
+<div class="row"><div><label>{{ t('dash.projstart') }}</label><input type="date" name="project_start" value="{{ e.project_start }}"></div>
+<div><label>{{ t('dash.projend') }}</label><input type="date" name="project_end" value="{{ e.project_end }}"></div>
+<div><label>{{ t('set.reqdue') }}</label><input name="request_due_days" value="{{ s.request_due_days }}"></div></div>
+<h2>{{ t('set.cascade') }}</h2>
+<div class="row"><div><label>{{ t('set.amounttol') }}</label><input name="amount_tolerance" value="{{ s.amount_tolerance }}"></div>
+<div><label>{{ t('set.datewin') }}</label><input name="date_window_days" value="{{ s.date_window_days }}"></div>
+<div><label>{{ t('set.refsim') }}</label><input name="fuzzy_ref_min" value="{{ s.fuzzy_ref_min }}"></div>
+<div><label>{{ t('set.descsim') }}</label><input name="desc_sim_min" value="{{ s.desc_sim_min }}"></div>
+<div><label>{{ t('set.maxsplit') }}</label><input name="max_split_group" value="{{ s.max_split_group }}"></div></div>
+<h2>{{ t('set.redflags') }}</h2>
+<div class="row"><div><label>{{ t('set.thresholds') }}</label><input name="approval_thresholds" value="{{ s.approval_thresholds|join(', ') }}"></div>
+<div><label>{{ t('set.band') }}</label><input name="threshold_band" value="{{ s.threshold_band }}"></div>
+<div><label>{{ t('set.dupwin') }}</label><input name="duplicate_window" value="{{ s.duplicate_window }}"></div>
+<div><label>{{ t('set.roundmod') }}</label><input name="round_modulo" value="{{ s.round_modulo }}"></div></div>
+<h2>{{ t('set.recurrence') }}</h2>
+<div class="row"><div><label>{{ t('set.minmonths') }}</label><input name="recurrence_min_months" value="{{ s.recurrence_min_months }}"></div>
+<div><label>{{ t('set.mincount') }}</label><input name="recurrence_min_count" value="{{ s.recurrence_min_count }}"></div></div>
+<h2>{{ t('set.watchlist') }}</h2>
+<div class="row"><div><label>IDs / phones / IBANs (one per line)</label><textarea name="watchlist_ids" rows="4">{{ s.watchlist_ids|join('\n') }}</textarea></div>
+<div><label>Name fragments (one per line)</label><textarea name="watchlist_names" rows="4">{{ s.watchlist_names|join('\n') }}</textarea></div></div>
+<button class="btn" style="margin-top:14px">{{ t('set.savesettings') }}</button>
+</div></form>
+{% endblock %}

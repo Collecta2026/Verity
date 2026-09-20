@@ -1,0 +1,31 @@
+{% extends 'base.html' %}{% block heading %}Accounts{% endblock %}
+{% block content %}
+<h1>{{ t('acc.title') }}</h1><p class="sub">Every bank, wallet or ledger source. Add as many as you need — the system is not limited to the five set up at the start.</p>
+{% if current_user.can('lead','finance_reviewer') %}
+<div class="card"><form method="post">
+  <div class="row">
+    <div><label>Code</label><input name="code" placeholder="QNB" required></div>
+    <div style="flex:2"><label>Name</label><input name="name" placeholder="Qatar National Bank — current account" required></div>
+    <div><label>Type</label><select name="kind"><option value="bank">Bank</option><option value="wallet">Wallet</option><option value="ledger">Ledger</option></select></div>
+    <div><label>{{ t('lbl.identifier') }}</label><input name="identifier" placeholder="IBAN / mobile"></div>
+    <div><label>{{ t('lbl.currency') }}</label><input name="currency" value="{{ e.currency }}"></div>
+  </div>
+  <label>Column mapping (optional JSON — defaults by type if blank)</label>
+  <textarea name="column_map" rows="3" class="mono" placeholder='{"date":"Value Date","amount_out":"Debit"}'></textarea>
+  <button class="btn" style="margin-top:12px">{{ t('act.add') }}</button>
+</form></div>
+{% endif %}
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.code') }}</th><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.type') }}</th><th>{{ t('lbl.identifier') }}</th><th>{{ t('lbl.currency') }}</th><th>{{ t('lbl.colmap') }}</th></tr>
+{% for a in accounts %}<tr>
+<td><b>{{ a.code }}</b></td><td>{{ a.name }}</td><td>{{ tv(a.kind) }}</td>
+<td class="mono">{{ a.identifier or '—' }}</td><td>{{ a.currency }}</td>
+<td>{% if current_user.can('lead','finance_reviewer') %}
+<form method="post" action="{{ url_for('account_map', eid=e.id, aid=a.id) }}" style="display:flex;gap:4px">
+<input name="column_map" class="mono" style="font-size:11px" value='{{ a.column_map_json or "" }}' placeholder="default">
+<button class="btn sm sec">Save</button></form>
+{% else %}<span class="muted">{{ 'custom' if a.column_map_json else 'default' }}</span>{% endif %}</td></tr>{% endfor %}
+</table></div>
+<div class="card"><b>Default mappings by type</b>
+<pre class="mono" style="font-size:11px;white-space:pre-wrap;color:var(--muted)">{{ maps }}</pre></div>
+{% endblock %}
