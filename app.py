@@ -16,7 +16,7 @@ from models import (db, User, AuditLog, Engagement, Account, Period, QuarterFile
                     SourceFile, Txn, Match, Split, Balance, Exception_, DocRequest,
                     DocumentFile, Task, TaskUpdate, FxRate, MappingTemplate,
                     ROLES, ROLE_LABELS, TASK_STATUS, REQ_STATUS, DOC_TYPES)
-import core, ingest, recon, forensics, project, reporting, requests_memo, i18n
+import core, ingest, recon, forensics, project, reporting, requests_memo, i18n, migrate
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -805,6 +805,15 @@ def init_db():
             db.session.rollback()
             app.logger.exception("create_all raced or failed; continuing")
         try:
+            # Bring a database created by an earlier version up to date. Adds
+            # missing columns only — never drops or rewrites existing data.
+            added = migrate.run(db, app.logger)
+            if added:
+                app.logger.info("migrate: added %d column(s): %s", len(added), ", ".join(added))
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("migrate failed; continuing")
+        try:
             import seed
             seed.run(app, db)
         except Exception:
@@ -828,6 +837,9 @@ def healthz():
         info["driver"] = app.config["SQLALCHEMY_DATABASE_URI"].split(":")[0]
         info["users"] = User.query.count()
         info["engagements"] = Engagement.query.count()
+        st = migrate.schema_status(db)
+        info["schema"] = ("up to date" if not (st["missing_tables"] or st["missing_columns"])
+                          else st)
     except Exception as ex:
         db.session.rollback()
         info["database"] = "ERROR"

@@ -87,6 +87,13 @@ erased on every deploy, which makes accounts and data vanish without warning. In
 page shows a setup notice telling you to set `DATABASE_URL`. Locally (on your own machine)
 it still uses SQLite automatically, so `run.bat` needs no setup.
 
+## Schema upgrades
+The app checks its own database at startup and adds any columns or tables a newer version
+needs. It only ever ADDs — nothing is dropped, renamed or rewritten, so existing rows and
+evidence are untouched, and running it repeatedly changes nothing. `/healthz` reports
+`"schema": "up to date"`, or lists exactly what is missing. You never need to drop the database
+to take an update.
+
 ## Troubleshooting a deploy
 - **Blank page or an error** — open `/healthz` first. It needs no login and reports whether the
   database is reachable, which driver is in use, and how many accounts exist.
