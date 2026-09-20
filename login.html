@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% block title %}{{ t('act.signin') }} · {{ t('app.name') }}{% endblock %}
+{% block anon %}
+<div class="login-wrap"><div class="login-card">
+  <div class="logo">V</div>
+  <h1 style="text-align:center;font-size:20px;margin:0 0 2px">{{ t('app.name') }}</h1>
+  <p style="text-align:center;color:var(--muted);margin:0 0 10px;font-size:13px">{{ t('app.tagline') }}</p>
+  <p style="text-align:center;margin:0 0 14px"><span class="langsel" style="justify-content:center">
+  {% for c,n in LANGS.items() %}<a class="{{ 'on' if lang==c }}" href="{{ url_for('set_lang', code=c) }}">{{ n }}</a>{% endfor %}</span></p>
+  {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat,m in msgs %}
+  <div class="flash error">{{ m }}</div>{% endfor %}{% endwith %}
+  <form method="post">
+    <label>{{ t('lbl.login') }}</label><input name="email" type="text" required autofocus
+           autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label>{{ t('lbl.password') }}</label><input name="password" type="password" required>
+    <button class="btn" style="width:100%;margin-top:16px">{{ t('act.signin') }}</button>
+  </form>
+</div></div>
+{% endblock %}

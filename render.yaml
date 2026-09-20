@@ -7,16 +7,18 @@ services:
     runtime: python
     region: frankfurt
     plan: starter          # always-on, so no cold starts mid-session
-    buildCommand: pip install -r requirements.txt psycopg2-binary
+    buildCommand: pip install -r requirements.txt
     # one worker with threads: this app holds no shared in-process state, and a
     # single worker removes any table-creation/seeding race at startup
     startCommand: gunicorn wsgi:app --workers 1 --threads 8 --timeout 120
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.6"
+        value: "3.12.11"   # also pinned by .python-version for non-Blueprint services
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
         sync: false        # paste the Neon connection string here in the dashboard
       - key: SEED_DEMO
         value: "0"         # set to "1" once to load the demo engagement, then back to "0"
+      - key: SHOW_ERRORS
+        value: "0"         # set to "1" temporarily to show tracebacks on the error page

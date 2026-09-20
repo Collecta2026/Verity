@@ -1,0 +1,37 @@
+{% extends 'base.html' %}{% block heading %}Exceptions{% endblock %}
+{% block content %}
+<h1>{{ t('exc.title') }}</h1><p class="sub">Every unmatched or suspicious item, auto-referenced for retrieval. Raise a document request against any of them.</p>
+<div class="card"><form method="get" style="display:flex;gap:10px;align-items:flex-end">
+<div><label>{{ t('lbl.quarter') }}</label><select name="quarter" onchange="this.form.submit()"><option value="">All</option>
+{% for q in quarters %}<option value="{{ q.quarter }}" {{ 'selected' if request.args.get('quarter')==q.quarter }}>{{ q.quarter }}</option>{% endfor %}</select></div>
+<div><label>{{ t('lbl.status') }}</label><select name="status" onchange="this.form.submit()"><option value="">All</option>
+{% for s in ['Open','Cleared','Unresolved'] %}<option {{ 'selected' if request.args.get('status')==s }}>{{ tv(s) }}</option>{% endfor %}</select></div>
+</form></div>
+{% for x in items %}
+<div class="card" style="padding:14px">
+<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+<div><b class="mono">{{ x.ref }}</b> · {{ tv(x.category) }} ·
+<span class="badge {{ 'b-ok' if x.status=='Cleared' else ('b-bad' if x.status=='Unresolved' else 'b-warn') }}">{{ tv(x.status) }}</span><br>
+<span class="muted">{{ x.date }} · {{ x.counterparty }} · {{ e.currency }} {{ '{:,.2f}'.format(x.amount or 0) }}</span><br>
+<span class="muted" style="font-size:12px">{{ x.detail }}</span>
+{% if x.resolution %}<br><span class="muted" style="font-size:12px">Resolution: {{ x.resolution }}</span>{% endif %}
+{% if x.requests %}<br>{% for r in x.requests %}<a class="badge b-mut mono" href="{{ url_for('request_memo', eid=e.id, rid=r.id) }}" target="_blank">{{ r.ref }} · {{ tv(r.status) }}</a> {% endfor %}{% endif %}
+</div>
+<div style="min-width:280px">
+{% if x.status=='Open' and current_user.can('lead','finance_reviewer','assistant') %}
+<form method="post" action="{{ url_for('raise_request', eid=e.id, xid=x.id) }}">
+<input name="addressee" placeholder="Addressee (e.g. former Finance Manager)" style="margin-bottom:4px">
+<textarea name="documents_needed" rows="2" placeholder="Invoice&#10;Payment authorisation" style="margin-bottom:4px"></textarea>
+<div style="display:flex;gap:4px">
+<select name="assigned_to" style="width:auto"><option value="">Assign…</option>{% for u in users %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select>
+<input type="date" name="due_date" style="width:auto">
+<button class="btn sm">{{ t('exc.requestdocs') }}</button></div></form>
+{% endif %}
+{% if current_user.can('lead','finance_reviewer') %}
+<form method="post" action="{{ url_for('clear_exception', eid=e.id, xid=x.id) }}" style="display:flex;gap:4px;margin-top:6px">
+<select name="status" style="width:auto"><option>Cleared</option><option>Open</option><option>Unresolved</option></select>
+<input name="resolution" placeholder="Reason" style="flex:1"><button class="btn sm sec">Set</button></form>
+{% endif %}
+</div></div></div>
+{% else %}<div class="card muted">No exceptions match.</div>{% endfor %}
+{% endblock %}

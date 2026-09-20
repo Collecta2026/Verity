@@ -49,6 +49,7 @@ T = {
  "act.onlymine":        ("Only mine", "مهامي فقط"),
  "act.language":        ("Language", "اللغة"),
  "lbl.email":           ("Email", "البريد الإلكتروني"),
+ "lbl.login":           ("Username or email", "اسم المستخدم أو البريد الإلكتروني"),
  "lbl.password":        ("Password", "كلمة المرور"),
  "lbl.name":            ("Name", "الاسم"),
  "lbl.client":          ("Client", "العميل"),

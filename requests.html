@@ -1,0 +1,29 @@
+{% extends 'base.html' %}{% block heading %}Document requests{% endblock %}
+{% block content %}
+<h1>{{ t('nav.requests') }}</h1><p class="sub">Each request has its own reference and a printable/emailable memo. Chase, record responses, and clear the underlying exception when accepted.</p>
+<div class="card"><form method="get" style="display:flex;gap:10px;align-items:flex-end">
+<div><label>{{ t('lbl.status') }}</label><select name="status" onchange="this.form.submit()"><option value="">All</option>
+{% for s in REQ_STATUS %}<option {{ 'selected' if request.args.get('status')==s }}>{{ tv(s) }}</option>{% endfor %}</select></div>
+<div style="display:flex;align-items:flex-end"><a class="btn sec sm" href="{{ url_for('requests_list', eid=e.id, mine=1) }}">Only mine</a></div>
+</form></div>
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.ref') }}</th><th>{{ t('req.transaction') }}</th><th>{{ t('exc.addressee') }}</th><th>{{ t('req.assigned') }}</th><th>{{ t('lbl.due') }}</th><th>{{ t('lbl.status') }}</th><th>{{ t('req.memo') }}</th><th>{{ t('act.update') }}</th></tr>
+{% for r in items %}<tr class="{{ 'rowbad' if r.overdue }}">
+<td class="mono">{{ r.ref }}</td>
+<td>{% if r.exception %}<span class="mono">{{ r.exception.ref }}</span><br><span class="muted" style="font-size:12px">{{ r.exception.counterparty }} · {{ '{:,.0f}'.format(r.exception.amount or 0) }}</span>{% endif %}</td>
+<td>{{ r.addressee or '—' }}</td><td class="muted">{{ r.assignee.name if r.assignee else '—' }}</td>
+<td class="{{ 'overdue' if r.overdue }}">{{ r.due_date }}{% if r.chased_count %}<br><span class="muted" style="font-size:11px">chased {{ r.chased_count }}×</span>{% endif %}</td>
+<td><span class="badge {{ 'b-ok' if r.status=='Accepted' else ('b-bad' if r.status in ['Rejected','Unresolved'] else 'b-warn') }}">{{ tv(r.status) }}</span></td>
+<td style="white-space:nowrap">
+<a class="btn sm sec" href="{{ url_for('request_memo', eid=e.id, rid=r.id, lang='en') }}" target="_blank">EN</a>
+<a class="btn sm sec" href="{{ url_for('request_memo', eid=e.id, rid=r.id, lang='ar') }}" target="_blank">ع</a>
+<a class="btn sm sec" href="{{ url_for('request_memo', eid=e.id, rid=r.id, format='text', lang=lang) }}" target="_blank">{{ t('act.emailtext') }}</a></td>
+<td>{% if current_user.can('lead','finance_reviewer','assistant') %}
+<form method="post" action="{{ url_for('update_request', eid=e.id, rid=r.id) }}" style="display:flex;gap:3px;flex-wrap:wrap">
+<select name="status" style="width:auto">{% for s in REQ_STATUS %}<option {{ 'selected' if r.status==s }}>{{ tv(s) }}</option>{% endfor %}</select>
+<select name="assigned_to" style="width:auto"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if r.assigned_to_id==u.id }}>{{ u.name }}</option>{% endfor %}</select>
+<input name="response_note" placeholder="note" style="width:110px">
+<button class="btn sm">Save</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">No requests yet — raise them from the Exceptions page.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

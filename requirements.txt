@@ -8,3 +8,6 @@ openpyxl
 rapidfuzz
 python-dotenv
 gunicorn
+# PostgreSQL driver. Needed on the server; skipped on Windows, where it tries to
+# build from source and fails — local testing uses SQLite and doesn't need it.
+psycopg2-binary; platform_system != "Windows"

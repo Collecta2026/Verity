@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setup required · Verity</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head><body>
+<div class="login-wrap"><div class="login-card" style="width:560px">
+  <div class="logo">V</div>
+  <h1 style="text-align:center;font-size:20px;margin:6px 0 2px">Setup required</h1>
+  <p class="sub" style="text-align:center">Verity started, but it has nowhere safe to store data.</p>
+  <div class="flash error" style="margin:14px 0">{{ msg }}</div>
+  <b style="font-size:13px">To fix this</b>
+  <ol style="font-size:13px;line-height:1.8;padding-left:20px;margin:6px 0 0">
+    <li>Create a Postgres database at <span class="mono">neon.tech</span> and copy its connection string.</li>
+    <li>In Render, open this service → <b>Environment</b>.</li>
+    <li>Add <span class="mono">DATABASE_URL</span> with that connection string as the value.</li>
+    <li>Save — Render redeploys automatically. This page will become the sign-in screen.</li>
+  </ol>
+  <p style="margin-top:16px"><a class="btn sec" href="{{ url_for('healthz') }}">System check</a></p>
+</div></div>
+</body></html>

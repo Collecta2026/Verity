@@ -1,0 +1,36 @@
+{% extends 'base.html' %}{% block heading %}{{ e.name }}{% endblock %}
+{% block content %}
+<h1>Overview</h1><p class="sub">{{ e.client }} · {{ e.currency }} · {{ e.period_start }} to {{ e.period_end }}</p>
+<div class="grid g4">
+  <div class="stat"><div class="n">{{ prog.months_done }}/{{ prog.months_total }}</div><div class="l">{{ t('dash.monthsrec') }}</div></div>
+  <div class="stat"><div class="n">{{ prog.done }}/{{ prog.tasks }}</div><div class="l">{{ t('ov.taskscomplete') }}</div></div>
+  <div class="stat {{ 'bad' if prog.open_exceptions }}"><div class="n">{{ prog.open_exceptions }}</div><div class="l">{{ t('dash.openexc') }}</div></div>
+  <div class="stat warn"><div class="n">{{ prog.open_requests }}</div><div class="l">{{ t('dash.openreq') }}</div></div>
+</div>
+
+<h2>{{ t('dash.quarters') }}</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.quarter') }}</th><th>{{ t('lbl.months') }}</th><th>{{ t('lbl.progress') }}</th><th>{{ t('lbl.status') }}</th><th></th></tr>
+{% for q in quarters %}<tr><td><b>{{ q.quarter }}</b></td><td class="muted">{{ q.months|join(', ') }}</td>
+<td><div class="pbar sm"><span style="width:{{ (q.done / (q.months|length) * 100)|round|int }}%"></span></div></td>
+<td><span class="badge {{ 'b-ok' if q.status=='Signed off' else ('b-warn' if q.status=='In progress' else 'b-mut') }}">{{ tv(q.status) }}</span></td>
+<td class="right"><a class="btn sm" href="{{ url_for('quarter', eid=e.id, quarter=q.quarter) }}">Open</a></td></tr>{% endfor %}
+</table></div>
+
+<h2>Accounts <span class="muted" style="font-size:13px;font-weight:400">({{ accounts|length }})</span></h2>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.code') }}</th><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.type') }}</th><th>{{ t('lbl.identifier') }}</th></tr>
+{% for a in accounts %}<tr><td><b>{{ a.code }}</b></td><td>{{ a.name }}</td><td>{{ tv(a.kind) }}</td><td class="mono">{{ a.identifier or '—' }}</td></tr>{% endfor %}
+</table></div>
+<p><a class="btn sec sm" href="{{ url_for('accounts', eid=e.id) }}">Add another account</a></p>
+
+{% if anomalies %}
+<h2>{{ t('ov.balanceanom') }}</h2>
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.account') }}</th><th>{{ t('lbl.month') }}</th><th>{{ t('bal.variance') }}</th><th>{{ t('lbl.contgap') }}</th><th>{{ t('bal.anomaly') }}</th></tr>
+{% for b in anomalies %}<tr><td>{{ b.account.code if b.account }}</td><td>{{ b.month }}</td>
+<td class="right">{{ '{:,.2f}'.format(b.variance) }}</td><td class="right">{{ '{:,.2f}'.format(b.continuity_gap) }}</td>
+<td class="muted">{{ b.anomaly }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

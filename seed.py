@@ -7,8 +7,15 @@ from config import DEFAULT_SETTINGS, STARTER_ACCOUNTS
 from models import (User, Engagement, Account, Txn, Balance, DocumentFile, ROLES)
 import core, project
 
+# Only the administrator is created on a live deployment. Every other account is
+# added from the Users page once signed in, so the team list is yours from the start.
 DEFAULTS = [
-    ("admin@verity.local", "Administrator", "admin", "System administrator", "Verity2026"),
+    ("admin", "Administrator", "admin", "System administrator", "Admin1234"),
+]
+
+# Extra accounts created only for the local demo (SEED_DEMO=1), so the demo
+# engagement has people to assign its tasks to.
+DEMO_USERS = [
     ("lead@verity.local", "Zak Saleh", "lead", "CFO / Forensic Lead", "Verity2026"),
     ("finance@verity.local", "Finance Manager", "finance_reviewer", "Finance Manager", "Verity2026"),
     ("support1@verity.local", "Support One", "assistant", "Data & Records Coordinator", "Verity2026"),
@@ -20,7 +27,10 @@ def run(app, db):
     # Per-user check (never "if any user exists") so a database left part-built
     # by an earlier failed start still gets its missing accounts. Committed one
     # at a time so a concurrent worker cannot abort the whole batch.
-    for email, name, role, title, pw in DEFAULTS:
+    accounts = list(DEFAULTS)
+    if app.config.get("SEED_DEMO"):
+        accounts += DEMO_USERS
+    for email, name, role, title, pw in accounts:
         u = User.query.filter_by(email=email).first()
         if u:
             if not u.active:                 # never leave a default account locked out

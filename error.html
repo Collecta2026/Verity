@@ -1,0 +1,16 @@
+<!doctype html><html lang="{{ lang|default('en') }}" dir="{{ 'rtl' if rtl else 'ltr' }}"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ code }} · Verity</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head><body>
+<div class="login-wrap"><div class="login-card" style="width:460px;text-align:center">
+  <div class="logo">V</div>
+  <h1 style="font-size:40px;margin:6px 0 0;color:var(--accent)">{{ code }}</h1>
+  <p class="sub" style="margin:4px 0 16px">{{ msg }}</p>
+  {% if detail %}<pre class="mono" style="text-align:left;background:#f7f9fc;border:1px solid var(--line);border-radius:7px;padding:10px;font-size:11px;white-space:pre-wrap;overflow-x:auto">{{ detail }}</pre>{% endif %}
+  <p style="margin-top:14px">
+    <a class="btn" href="{{ url_for('login') }}">Sign in</a>
+    <a class="btn sec" href="{{ url_for('healthz') }}">System check</a>
+  </p>
+</div></div>
+</body></html>

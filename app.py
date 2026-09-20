@@ -10,6 +10,7 @@ from flask import (Flask, render_template, request, redirect, url_for, flash,
 from flask_login import (LoginManager, login_user, logout_user, login_required, current_user)
 from werkzeug.utils import secure_filename
 
+import config as appconfig
 from config import Config, DEFAULT_SETTINGS, STARTER_ACCOUNTS
 from models import (db, User, AuditLog, Engagement, Account, Period, QuarterFile,
                     SourceFile, Txn, Match, Split, Balance, Exception_, DocRequest,
@@ -27,7 +28,18 @@ login_manager.login_view = "login"
 
 @login_manager.user_loader
 def load_user(uid):
-    return db.session.get(User, int(uid))
+    """Runs on every request that carries a session cookie — including the
+    login page itself. A stale cookie or an unreachable database must not
+    take the page down, so failures return None (treated as logged out)."""
+    try:
+        return db.session.get(User, int(uid))
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        app.logger.exception("load_user failed for %r", uid)
+        return None
 
 
 def log(action, entity=None, entity_id=None, before=None, after=None, detail=""):
@@ -63,6 +75,32 @@ def pdate(s):
         return None
 
 
+# Render may be configured to start either "app:app" or "wsgi:app". wsgi.py runs
+# init_db() at import; app.py on its own would not, leaving the app with no tables.
+# This guard makes both start commands behave identically.
+_READY = {"done": False}
+
+
+@app.before_request
+def _ensure_ready():
+    if _READY["done"] or appconfig.CONFIG_ERROR:
+        return
+    _READY["done"] = True          # set first: one attempt, never a request loop
+    try:
+        init_db()
+        app.logger.info("Verity: database initialised on first request")
+    except Exception:
+        app.logger.exception("Verity: first-request initialisation failed")
+
+
+@app.before_request
+def _config_gate():
+    """If the app is hosted without a database configured, say so plainly on
+    every page instead of half-working and losing data at the next deploy."""
+    if appconfig.CONFIG_ERROR and request.endpoint not in ("healthz", "static"):
+        return render_template("setup.html", msg=appconfig.CONFIG_ERROR), 503
+
+
 @app.teardown_request
 def _teardown(exc):
     if exc is not None:
@@ -89,7 +127,8 @@ def set_lang(code):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = User.query.filter_by(email=request.form["email"].lower().strip()).first()
+        ident = request.form.get("email", "").strip().lower()
+        u = User.query.filter_by(email=ident).first()
         if u and u.active and u.check_password(request.form["password"]):
             login_user(u)
             log("login")
@@ -652,6 +691,11 @@ def forbidden(err):
                            msg="You don't have permission for that action."), 403
 
 
+@app.errorhandler(401)
+def unauthorised(err):
+    return redirect(url_for("login"))
+
+
 @app.errorhandler(404)
 def notfound(err):
     return render_template("error.html", code=404, msg="Not found."), 404
@@ -679,7 +723,11 @@ def healthz():
     """Unauthenticated diagnostics — tells you whether the database is
     reachable and whether the default users exist."""
     from sqlalchemy import text
-    info = {"app": "ok"}
+    info = {"app": "ok",
+            "database_url_configured": bool(os.environ.get("DATABASE_URL")),
+            "hosted": appconfig.IS_HOSTED}
+    if appconfig.CONFIG_ERROR:
+        info["config_error"] = appconfig.CONFIG_ERROR
     try:
         db.session.execute(text("SELECT 1"))
         info["database"] = "connected"
@@ -694,10 +742,30 @@ def healthz():
 
 
 @app.errorhandler(500)
+@app.errorhandler(Exception)
 def server_error(err):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(err, HTTPException) and err.code != 500:
+        return err
     app.logger.exception("Unhandled error")
-    return render_template("error.html", code=500,
-        msg="Something went wrong. Check /healthz and the server logs."), 500
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+    detail = None
+    if os.environ.get("SHOW_ERRORS") == "1":
+        import traceback
+        detail = traceback.format_exc()[-1500:]
+    try:
+        return render_template("error.html", code=500,
+            msg="Something went wrong. Open the system check below, "
+                "or look at the server logs for the full trace.",
+            detail=detail), 500
+    except Exception:
+        # last resort — never return a blank page
+        return Response(f"500 — internal error.\n{detail or ''}\n"
+                        f"Try /healthz for a system check.",
+                        status=500, mimetype="text/plain")
 
 
 if __name__ == "__main__":

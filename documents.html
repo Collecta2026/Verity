@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% block heading %}Document library{% endblock %}
+{% block content %}
+<h1>{{ t('doc.title') }}</h1><p class="sub">Every document gets an automatic reference (e.g. {{ e.code }}-DOC-000042) so it can be retrieved later and tied back to its transaction and request.</p>
+{% if current_user.can('lead','finance_reviewer','assistant') %}
+<div class="card"><form method="post" enctype="multipart/form-data">
+<div class="row">
+<div style="flex:2"><label>File</label><input type="file" name="file" required></div>
+<div><label>Type</label><select name="doc_type">{% for d in DOC_TYPES %}<option>{{ d }}</option>{% endfor %}</select></div>
+<div><label>{{ t('lbl.quarter') }}</label><select name="quarter"><option value="">—</option>{% for q in quarters %}<option>{{ q.quarter }}</option>{% endfor %}</select></div>
+<div><label>{{ t('doc.txnref') }}</label><input name="txn_reference" placeholder="TRX1042"></div>
+<div><label>{{ t('doc.against') }}</label><select name="request_id"><option value="">—</option>
+{% for r in open_requests %}<option value="{{ r.id }}">{{ r.ref }}</option>{% endfor %}</select></div>
+</div><button class="btn" style="margin-top:12px">{{ t('doc.filedoc') }}</button></form></div>
+{% endif %}
+<div class="card" style="padding:0"><table>
+<tr><th>{{ t('lbl.ref') }}</th><th>{{ t('lbl.filename') }}</th><th>{{ t('lbl.type') }}</th><th>{{ t('lbl.quarter') }}</th><th>{{ t('lbl.txnref') }}</th><th>{{ t('lbl.uploaded') }}</th></tr>
+{% for d in docs %}<tr><td class="mono"><b>{{ d.ref }}</b></td><td>{{ d.filename }}</td><td>{{ d.doc_type or '—' }}</td>
+<td>{{ d.quarter or '—' }}</td><td class="mono">{{ d.txn_reference or '—' }}</td>
+<td class="muted">{{ d.uploaded_at.strftime('%d %b %Y') }}</td></tr>
+{% else %}<tr><td colspan="6" class="muted">{{ t('doc.none') }}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}
