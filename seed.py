@@ -1,7 +1,7 @@
 """
 seed.py — default users and (optionally) a demo engagement.
 """
-import json, random
+import json, os, random
 from datetime import date, timedelta, datetime
 from config import DEFAULT_SETTINGS, STARTER_ACCOUNTS
 from models import (User, Engagement, Account, Txn, Balance, DocumentFile, ROLES)
@@ -17,14 +17,51 @@ DEFAULTS = [
 
 
 def run(app, db):
-    if not User.query.first():
-        for email, name, role, title, pw in DEFAULTS:
-            u = User(email=email, name=name, role=role, title=title)
-            u.set_password(pw)
-            db.session.add(u)
-        db.session.commit()
+    # Per-user check (never "if any user exists") so a database left part-built
+    # by an earlier failed start still gets its missing accounts. Committed one
+    # at a time so a concurrent worker cannot abort the whole batch.
+    for email, name, role, title, pw in DEFAULTS:
+        u = User.query.filter_by(email=email).first()
+        if u:
+            if not u.active:                 # never leave a default account locked out
+                u.active = True
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+            continue
+        u = User(email=email, name=name, role=role, title=title, active=True)
+        u.set_password(pw)
+        db.session.add(u)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    _bootstrap_admin(db)
     if app.config.get("SEED_DEMO") and not Engagement.query.first():
         _demo(db)
+
+
+def _bootstrap_admin(db):
+    """Escape hatch: set ADMIN_EMAIL and ADMIN_PASSWORD in the environment and
+    that account is created, or its password reset and reactivated, on boot.
+    Use it if you are ever locked out; clear the variables afterwards."""
+    email = os.environ.get("ADMIN_EMAIL", "").lower().strip()
+    pw = os.environ.get("ADMIN_PASSWORD", "")
+    if not (email and pw):
+        return
+    u = User.query.filter_by(email=email).first()
+    if not u:
+        u = User(email=email, name=os.environ.get("ADMIN_NAME", "Administrator"),
+                 role="admin", title="System administrator", active=True)
+        db.session.add(u)
+    u.role, u.active = "admin", True
+    u.set_password(pw)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _demo(db):

@@ -47,6 +47,13 @@ python app.py            # http://localhost:5000
 4. **Domain** — add e.g. `audit.awspro.uk` in Render, then a **CNAME** (not AAAA) at
    Names.co.uk pointing to the Render URL. SSL issues automatically.
 
+## If you are ever locked out
+Visit `/healthz` — it reports, without logging in, whether the database is reachable and how
+many user accounts exist. If it shows `users: 0`, redeploy: the accounts are created on every
+boot for any that are missing. To force a known admin account, set `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` in Render's environment and redeploy — that account is created (or its
+password reset and reactivated) on startup. Clear both variables afterwards.
+
 ## Default logins (change immediately)
 | Role | Email | Password |
 |---|---|---|

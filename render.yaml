@@ -8,7 +8,9 @@ services:
     region: frankfurt
     plan: starter          # always-on, so no cold starts mid-session
     buildCommand: pip install -r requirements.txt psycopg2-binary
-    startCommand: gunicorn wsgi:app
+    # one worker with threads: this app holds no shared in-process state, and a
+    # single worker removes any table-creation/seeding race at startup
+    startCommand: gunicorn wsgi:app --workers 1 --threads 8 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"

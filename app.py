@@ -63,6 +63,13 @@ def pdate(s):
         return None
 
 
+@app.teardown_request
+def _teardown(exc):
+    if exc is not None:
+        db.session.rollback()
+    db.session.remove()
+
+
 @app.context_processor
 def inject():
     return {"ROLE_LABELS": ROLE_LABELS, "ROLES": ROLES, "TASK_STATUS": TASK_STATUS,
@@ -651,10 +658,46 @@ def notfound(err):
 
 
 def init_db():
+    """Create tables and seed defaults. Safe to run concurrently in several
+    gunicorn workers — a race just means the other worker got there first."""
     with app.app_context():
-        db.create_all()
-        import seed
-        seed.run(app, db)
+        try:
+            db.create_all()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("create_all raced or failed; continuing")
+        try:
+            import seed
+            seed.run(app, db)
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("seed raced or failed; continuing")
+
+
+@app.route("/healthz")
+def healthz():
+    """Unauthenticated diagnostics — tells you whether the database is
+    reachable and whether the default users exist."""
+    from sqlalchemy import text
+    info = {"app": "ok"}
+    try:
+        db.session.execute(text("SELECT 1"))
+        info["database"] = "connected"
+        info["driver"] = app.config["SQLALCHEMY_DATABASE_URI"].split(":")[0]
+        info["users"] = User.query.count()
+        info["engagements"] = Engagement.query.count()
+    except Exception as ex:
+        db.session.rollback()
+        info["database"] = "ERROR"
+        info["error"] = f"{type(ex).__name__}: {ex}"
+    return info
+
+
+@app.errorhandler(500)
+def server_error(err):
+    app.logger.exception("Unhandled error")
+    return render_template("error.html", code=500,
+        msg="Something went wrong. Check /healthz and the server logs."), 500
 
 
 if __name__ == "__main__":
