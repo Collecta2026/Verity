@@ -9,7 +9,8 @@
   {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat,m in msgs %}
   <div class="flash error">{{ m }}</div>{% endfor %}{% endwith %}
   <form method="post">
-    <label>{{ t('lbl.email') }}</label><input name="email" type="email" required autofocus>
+    <label>{{ t('lbl.login') }}</label><input name="email" type="text" required autofocus
+           autocapitalize="none" autocorrect="off" spellcheck="false">
     <label>{{ t('lbl.password') }}</label><input name="password" type="password" required>
     <button class="btn" style="width:100%;margin-top:16px">{{ t('act.signin') }}</button>
   </form>

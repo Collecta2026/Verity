@@ -3,7 +3,8 @@
 <h1>Users &amp; roles</h1><p class="sub">Add team members and set what they can do. Every action they take is written to the audit trail.</p>
 <div class="card"><form method="post"><div class="row">
 <div><label>Name</label><input name="name" required></div>
-<div><label>Email</label><input name="email" type="email" required></div>
+<div><label>Email</label><input name="email" type="text" required autocapitalize="none" spellcheck="false"
+       placeholder="name@company.com or a short username"></div>
 <div><label>{{ t('lbl.title') }}</label><input name="title" placeholder="Finance Manager"></div>
 <div><label>{{ t('lbl.role') }}</label><select name="role">{% for r in ROLES %}<option value="{{ r }}">{{ tv(ROLE_LABELS[r]) }}</option>{% endfor %}</select></div>
 <div><label>Password</label><input name="password" required></div>
