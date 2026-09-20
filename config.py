@@ -61,6 +61,19 @@ DEFAULT_SETTINGS = {
     "watchlist_names": [],
 }
 
+# Currencies offered in the dropdowns. EGP and USD first as the working pair;
+# "Other" lets any ISO code be typed in.
+CURRENCIES = [
+    ("EGP", "EGP — Egyptian pound"),
+    ("USD", "USD — US dollar"),
+    ("EUR", "EUR — Euro"),
+    ("GBP", "GBP — Pound sterling"),
+    ("SAR", "SAR — Saudi riyal"),
+    ("AED", "AED — UAE dirham"),
+    ("KWD", "KWD — Kuwaiti dinar"),
+    ("CNY", "CNY — Chinese yuan"),
+]
+
 STARTER_ACCOUNTS = [
     ("CIB",   "Commercial International Bank", "bank",   ""),
     ("NBE",   "National Bank of Egypt",        "bank",   ""),

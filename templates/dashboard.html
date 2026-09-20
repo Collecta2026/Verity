@@ -44,7 +44,7 @@
   <div class="row"><div><label>Name</label><input name="name" required></div>
   <div><label>{{ t('lbl.client') }}</label><input name="client"></div>
   <div><label>Code (for references)</label><input name="code" value="SGE"></div>
-  <div><label>{{ t('lbl.currency') }}</label><input name="currency" value="EGP"></div></div>
+  <div><label>{{ t('lbl.currency') }} <span class="muted" style="font-weight:400">(base)</span></label><select name="currency" onchange="if(this.value===''){document.getElementById('engOther').style.display='block'}else{document.getElementById('engOther').style.display='none'}">{% for code, label in CURRENCIES %}<option value="{{ code }}">{{ label }}</option>{% endfor %}<option value="">Other…</option></select><input name="currency_other" id="engOther" placeholder="ISO code" maxlength="10" style="display:none;margin-top:5px"></div></div>
   <div class="row"><div><label>{{ t('dash.recordsfrom') }}</label><input type="date" name="period_start" value="2023-05-01"></div>
   <div><label>{{ t('dash.recordsto') }}</label><input type="date" name="period_end" value="2026-06-30"></div>
   <div><label>{{ t('dash.projstart') }}</label><input type="date" name="project_start" value="2026-09-21"></div>

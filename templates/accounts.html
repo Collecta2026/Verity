@@ -1,31 +1,68 @@
-{% extends 'base.html' %}{% block heading %}Accounts{% endblock %}
+{% extends 'base.html' %}{% block heading %}{{ t('acc.title') }}{% endblock %}
 {% block content %}
-<h1>{{ t('acc.title') }}</h1><p class="sub">Every bank, wallet or ledger source. Add as many as you need — the system is not limited to the five set up at the start.</p>
+<h1>{{ t('acc.title') }}</h1>
+<p class="sub">{{ t('acc.sub') }} Each account has its own currency — a USD bank account is
+reconciled in USD and never matched against {{ e.currency }} entries.</p>
+
 {% if current_user.can('lead','finance_reviewer') %}
 <div class="card"><form method="post">
   <div class="row">
-    <div><label>Code</label><input name="code" placeholder="QNB" required></div>
-    <div style="flex:2"><label>Name</label><input name="name" placeholder="Qatar National Bank — current account" required></div>
-    <div><label>Type</label><select name="kind"><option value="bank">Bank</option><option value="wallet">Wallet</option><option value="ledger">Ledger</option></select></div>
+    <div><label>{{ t('lbl.code') }}</label><input name="code" placeholder="QNB" required></div>
+    <div style="flex:2"><label>{{ t('lbl.name') }}</label><input name="name" placeholder="Qatar National Bank — current account" required></div>
+    <div><label>{{ t('lbl.type') }}</label><select name="kind">
+      <option value="bank">{{ t('acc.bank') }}</option>
+      <option value="wallet">{{ t('acc.wallet') }}</option>
+      <option value="ledger">{{ t('acc.ledger') }}</option></select></div>
     <div><label>{{ t('lbl.identifier') }}</label><input name="identifier" placeholder="IBAN / mobile"></div>
-    <div><label>{{ t('lbl.currency') }}</label><input name="currency" value="{{ e.currency }}"></div>
+    <div><label>{{ t('lbl.currency') }}</label>
+      <select name="currency" onchange="otherBox(this,'newOther')">
+        {% for code, label in CURRENCIES %}<option value="{{ code }}" {{ 'selected' if code == e.currency }}>{{ label }}</option>{% endfor %}
+        <option value="">Other…</option>
+      </select>
+      <input name="currency_other" id="newOther" placeholder="ISO code e.g. JPY"
+             style="display:none;margin-top:5px" maxlength="10">
+    </div>
   </div>
-  <label>Column mapping (optional JSON — defaults by type if blank)</label>
-  <textarea name="column_map" rows="3" class="mono" placeholder='{"date":"Value Date","amount_out":"Debit"}'></textarea>
+  <label>{{ t('acc.colmap') }} <span class="muted" style="font-weight:400">({{ t('acc.colmapopt') }} — normally left blank; you map columns when uploading)</span></label>
+  <textarea name="column_map" rows="2" class="mono" placeholder='{"date":"Value Date","amount_out":"Debit"}'></textarea>
   <button class="btn" style="margin-top:12px">{{ t('act.add') }}</button>
 </form></div>
 {% endif %}
-<div class="card" style="padding:0"><table>
-<tr><th>{{ t('lbl.code') }}</th><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.type') }}</th><th>{{ t('lbl.identifier') }}</th><th>{{ t('lbl.currency') }}</th><th>{{ t('lbl.colmap') }}</th></tr>
+
+<div class="card" style="padding:0;overflow-x:auto"><table>
+<tr><th>{{ t('lbl.code') }}</th><th>{{ t('lbl.name') }}</th><th>{{ t('lbl.type') }}</th>
+<th>{{ t('lbl.identifier') }}</th><th>{{ t('lbl.currency') }}</th>
+{% if current_user.can('lead','finance_reviewer') %}<th>{{ t('usr.change') }}</th>{% endif %}</tr>
 {% for a in accounts %}<tr>
 <td><b>{{ a.code }}</b></td><td>{{ a.name }}</td><td>{{ tv(a.kind) }}</td>
-<td class="mono">{{ a.identifier or '—' }}</td><td>{{ a.currency }}</td>
-<td>{% if current_user.can('lead','finance_reviewer') %}
-<form method="post" action="{{ url_for('account_map', eid=e.id, aid=a.id) }}" style="display:flex;gap:4px">
-<input name="column_map" class="mono" style="font-size:11px" value='{{ a.column_map_json or "" }}' placeholder="default">
-<button class="btn sm sec">Save</button></form>
-{% else %}<span class="muted">{{ 'custom' if a.column_map_json else 'default' }}</span>{% endif %}</td></tr>{% endfor %}
+<td class="mono">{{ a.identifier or '—' }}</td>
+<td><span class="badge {{ 'b-warn' if a.currency != e.currency else 'b-mut' }}">{{ a.currency }}</span></td>
+{% if current_user.can('lead','finance_reviewer') %}
+<td><form method="post" action="{{ url_for('account_edit', eid=e.id, aid=a.id) }}"
+          style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+  <input name="name" value="{{ a.name }}" style="width:150px">
+  <input name="identifier" value="{{ a.identifier or '' }}" placeholder="IBAN / mobile" style="width:120px">
+  <select name="currency" style="width:auto" onchange="otherBox(this,'other{{ a.id }}')">
+    {% for code, label in CURRENCIES %}<option value="{{ code }}" {{ 'selected' if code == a.currency }}>{{ code }}</option>{% endfor %}
+    <option value="" {{ 'selected' if a.currency not in CURRENCIES|map(attribute=0)|list }}>Other…</option>
+  </select>
+  <input name="currency_other" id="other{{ a.id }}" placeholder="ISO" maxlength="10" style="width:70px;
+    display:{{ 'inline-block' if a.currency not in CURRENCIES|map(attribute=0)|list else 'none' }}"
+    value="{{ a.currency if a.currency not in CURRENCIES|map(attribute=0)|list else '' }}">
+  <button class="btn sm">{{ t('act.save') }}</button>
+</form></td>{% endif %}
+</tr>{% endfor %}
 </table></div>
-<div class="card"><b>Default mappings by type</b>
-<pre class="mono" style="font-size:11px;white-space:pre-wrap;color:var(--muted)">{{ maps }}</pre></div>
+<p class="muted" style="font-size:12px">Changing an account's currency restates the transactions
+already loaded for it, unless their source file carried its own currency column. Rates for
+non-{{ e.currency }} accounts are entered under <a href="{{ url_for('fx', eid=e.id) }}">{{ t('nav.fx') }}</a>.</p>
+
+<script>
+function otherBox(sel, id){
+  var box = document.getElementById(id);
+  if(!box) return;
+  box.style.display = sel.value === "" ? "inline-block" : "none";
+  if(sel.value !== "") box.value = "";
+}
+</script>
 {% endblock %}

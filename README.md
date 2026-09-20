@@ -16,6 +16,9 @@ be sent to an Arabic-speaking recipient while you work in English.
 Each account carries its own currency (EGP, USD, or any other), and every transaction keeps the
 currency it was recorded in.
 
+- **Each account has its own currency**, chosen from a dropdown (EGP, USD, EUR, GBP, SAR, AED,
+  KWD, CNY, or any other ISO code you type in). An account's currency can be changed later, which
+  restates the transactions already loaded for it.
 - **Matching never crosses currencies.** A USD payment is only ever matched against a USD entry —
   even with an identical amount, reference and date. Matching across currencies would manufacture
   false clearances, so the engine treats currency as part of the match key.

@@ -11,7 +11,7 @@ from flask_login import (LoginManager, login_user, logout_user, login_required, 
 from werkzeug.utils import secure_filename
 
 import config as appconfig
-from config import Config, DEFAULT_SETTINGS, STARTER_ACCOUNTS
+from config import Config, DEFAULT_SETTINGS, STARTER_ACCOUNTS, CURRENCIES
 from models import (db, User, AuditLog, Engagement, Account, Period, QuarterFile,
                     SourceFile, Txn, Match, Split, Balance, Exception_, DocRequest,
                     DocumentFile, Task, TaskUpdate, FxRate, MappingTemplate,
@@ -113,7 +113,7 @@ def inject():
     return {"ROLE_LABELS": ROLE_LABELS, "ROLES": ROLES, "TASK_STATUS": TASK_STATUS,
             "REQ_STATUS": REQ_STATUS, "DOC_TYPES": DOC_TYPES, "today": date.today(),
             "t": i18n.t, "tv": i18n.tv, "lang": i18n.get_lang(), "rtl": i18n.is_rtl(),
-            "LANGS": i18n.LANGS}
+            "LANGS": i18n.LANGS, "CURRENCIES": CURRENCIES}
 
 
 @app.route("/lang/<code>")
@@ -166,7 +166,7 @@ def create_engagement():
     f = request.form
     e = Engagement(name=f["name"].strip(), client=f.get("client", "").strip(),
                    code=(f.get("code") or "SGE").strip().upper(),
-                   currency=f.get("currency", "EGP"),
+                   currency=(f.get("currency_other") or f.get("currency") or "EGP").strip().upper()[:10],
                    period_start=pdate(f.get("period_start")), period_end=pdate(f.get("period_end")),
                    project_start=pdate(f.get("project_start")), project_end=pdate(f.get("project_end")),
                    created_by=current_user.id)
@@ -202,9 +202,10 @@ def accounts(eid):
         if not current_user.can("lead", "finance_reviewer"):
             abort(403)
         f = request.form
+        ccy = (f.get("currency_other") or f.get("currency") or e.currency).strip().upper()[:10]
         a = Account(engagement_id=eid, code=f["code"].strip().upper(), name=f["name"].strip(),
                     kind=f["kind"], identifier=f.get("identifier", "").strip(),
-                    currency=f.get("currency") or e.currency)
+                    currency=ccy)
         if f.get("column_map"):
             try:
                 a.set_column_map(json.loads(f["column_map"]))
@@ -218,6 +219,43 @@ def accounts(eid):
     return render_template("accounts.html", e=e,
         accounts=Account.query.filter_by(engagement_id=eid).all(),
         maps=ingest.DEFAULT_MAPS)
+
+
+@app.route("/engagement/<int:eid>/accounts/<int:aid>/edit", methods=["POST"])
+@roles_required("lead", "finance_reviewer")
+def account_edit(eid, aid):
+    """Change an account's currency, name or identifier after it was created.
+    Changing the currency restates the transactions already loaded for it."""
+    a = db.session.get(Account, aid)
+    if not a or a.engagement_id != eid:
+        abort(404)
+    e = get_e(eid)
+    f = request.form
+    before = f"{a.name}/{a.currency}/{a.identifier}"
+    if f.get("name"):
+        a.name = f["name"].strip()
+    if f.get("identifier") is not None:
+        a.identifier = f.get("identifier", "").strip()
+    new_ccy = (f.get("currency_other") or f.get("currency") or "").strip().upper()[:10]
+    moved = 0
+    if new_ccy and new_ccy != a.currency:
+        old = a.currency
+        a.currency = new_ccy
+        # Transactions already loaded under the old currency follow the account,
+        # unless their own file carried an explicit currency column.
+        for t in Txn.query.filter_by(engagement_id=eid, account_id=a.id).all():
+            if (t.currency or old) == old:
+                t.currency = new_ccy
+                moved += 1
+        for b in Balance.query.filter_by(engagement_id=eid, account_id=a.id).all():
+            b.currency = new_ccy
+    db.session.commit()
+    if moved:
+        core.reprice(e)
+    log("account.edit", "account", aid, before=before,
+        after=f"{a.name}/{a.currency}/{a.identifier}")
+    flash(f"{a.code} updated." + (f" {moved} transaction(s) restated as {a.currency}." if moved else ""), "ok")
+    return redirect(url_for("accounts", eid=eid))
 
 
 @app.route("/engagement/<int:eid>/accounts/<int:aid>/map", methods=["POST"])
